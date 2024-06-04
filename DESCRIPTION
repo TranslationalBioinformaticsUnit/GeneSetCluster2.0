@@ -1,0 +1,31 @@
+Package: GeneSetCluster
+Type: Package
+Title: GeneSetCluster 2.0: an upgraded comprehensive toolset for summarizing and integrating gene-sets analysis
+Version: 2.0
+Authors@R: c(person("Asier", "Ortega-Legarreta", role = c("aut","cre"),  
+           email = "aortegal@navarra.es", 
+           comment = c(ORCID = "0009-0000-3563-5362")),
+           person("Alberto", "Maillo", role = c("aut"),  
+           email = "alberto.ruizdeinfante@kaust.edu.sa"),
+           person("Ewoud", "Ewing", role = c("aut"),  
+           email = "ewoud.ewing@ki.se"))
+Maintainer: Asier Ortega-Legarreta <aortegal@navarra.es>
+Description: GeneSetCluster is a package for clustering Gene sets.
+License: GPL-2
+Encoding: UTF-8
+LazyData: true
+Depends: R (>= 4.3.0)
+Imports: limma, stats, methods, RColorBrewer, clusterProfiler,
+        readxl, cluster, factoextra, stringr, AnnotationDbi, ComplexHeatmap,  
+        GetoptLong, bigstatsr, colorRamp2, 
+        doParallel, foreach, ggplot2, 
+        grid, parallel, patchwork, pbapply, 
+        reshape2, seriation, graphics, simplifyEnrichment, slam, 
+        utils, grDevices, rGREAT (>= 2.1), org.Hs.eg.db, org.Mm.eg.db, 
+        STRINGdb, GGally, network, httr, jsonlite, dplyr, shiny
+Suggests: RUnit, BiocGenerics, knitr (>= 1.6), rmarkdown, BiocStyle (>= 1.3), 
+        roxygen2
+VignetteBuilder: knitr
+RoxygenNote: 7.3.1
+git_url: https://github.com/TranslationalBioinformaticsUnit/GeneSetCluster2.0
+Packaged: 2023-08-10 12:55:36 UTC; asier.ortega
