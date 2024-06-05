@@ -56,7 +56,6 @@ setGeneric(name="GenesPerGeneSet",
 
 
 setMethod(f="GenesPerGeneSet",
-          signature="PathwayObject",
           definition=function(Object, uniquePathways=FALSE, clusterIndependent=FALSE)
           {
             message("[=============================================================]")

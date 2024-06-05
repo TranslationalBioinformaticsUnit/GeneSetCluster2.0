@@ -46,7 +46,6 @@ setGeneric(name="ORAGeneSets",
 
 
 setMethod(f="ORAGeneSets",
-          signature = "PathwayObject",
           definition = function(Object, uniquePathway=FALSE, clusterIndependent=FALSE)
           {
 

@@ -1,26 +1,4 @@
-#' PlotTreePathway
-#'
-#' Plots a tree plot with the distances per pathway.
-#' @import ggplot2
-#' @import tidyverse
-#' @import stats
-#' @import ggdendro
-#' @import cowplot
-#' @import clusterProfiler
-#' @import ggtree
-#' @import patchwork
-#' @import RColorBrewer
-#'
-#' @param Object a pathway object
-#' @param clusters A numeric with the number of clusters required
-#' @param nodenames boolean to add names to the nodes
-#' @param doORA boolean perform ORA analysis
-#' @param wordcloud boolean perform boolean to add wordcloud annotations of each cluster
-#'
-#' @return plot
-#'
-#' @export
-#'
+
 setGeneric(name="PlotTree",
            def=function(Object, clusters = length(unique(Object@Data[[1]]$cluster)), nodenames = TRUE, doORA = TRUE, wordcloud = TRUE)
            {
@@ -29,27 +7,7 @@ setGeneric(name="PlotTree",
 )
 
 
-#' PlotTreePathway
-#'
-#' @param Object a pathway object
-#' @param clusters A numeric with the number of clusters required
-#' @param nodenames boolean to add names to the nodes
-#' @param doORA boolean perform ORA analysis
-#' @param wordcloud boolean perform boolean to add wordcloud annotations of each cluster
-#'
-#' @import ggplot2
-#' @import tidyverse
-#' @import stats
-#' @import ggdendro
-#' @import cowplot
-#' @import clusterProfiler
-#' @import ggtree
-#' @import patchwork
-#' @import RColorBrewer
-#'
-#' @return plot
-#'
-#' @examples
+
 
 setMethod(f="PlotTree",
           signature = "PathwayObject",

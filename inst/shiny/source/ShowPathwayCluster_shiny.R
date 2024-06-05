@@ -1,18 +1,4 @@
-#' ShowPathwayCluster
-#'
-#' Show the GO terms and descriptions of the generated cluster with PlotPathwayCluster.
-#' @import AnnotationDbi
-#' @import GO.db
-#'
-#' @param Object a pathway object
-#' @param cluster the number of the cluster want to show information or "ALL" for all the clusters information.
-#' @param nPathway minimum number of pathways per group, used in PlotPathwayCluster
-#' @param uniquePathways boolean for unique pathways
-#'
-#' @return data.frame
-#'
-#' @export
-#'
+
 setGeneric(name="ShowPathwayCluster",
            def=function(Object, cluster = "ALL", nPathway = 4, uniquePathways = FALSE)
            {
@@ -21,14 +7,6 @@ setGeneric(name="ShowPathwayCluster",
 )
 
 
-#' ShowPathwayCluster
-#'
-#' @param Object a pathway object
-#' @param nPathway minimum number of pathways per group
-#'
-#' @return data.frame
-#'
-#' @examples
 
 setMethod(f="ShowPathwayCluster",
           signature = "PathwayObject",
@@ -72,8 +50,8 @@ setMethod(f="ShowPathwayCluster",
   }
 
   mat_cor <- mat_sym[Object@cIndependentMethod[[1]][[1]], Object@cIndependentMethod[[1]][[1]]]
-  
-  
+
+
   res <- obtainDefCluster(mat_cor)
 
   if (length(res[which(lapply(res, function(x) length(x))>=nPathway)]) == 0) {

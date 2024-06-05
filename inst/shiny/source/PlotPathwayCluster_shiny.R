@@ -1,43 +1,10 @@
-#' PlotPathwayCluster
-#'
-#' Plots a correlation matrix showing the correlation between the pathways and a functional annotation of the group of pathways based on GO terms descriptions.
-#' @import simplifyEnrichment
-#' @import slam
-#' @import GetoptLong
-#' @import ComplexHeatmap
-#' @import grid
-#' @import RColorBrewer
-#' @import colorRamp2
-#' @import seriation
-#'
-#'
-#' @param Object a pathway object
-#' @param doORA boolean perform ORA analysis
-#' @param wordcloud boolean perform boolean to add wordcloud annotations of each cluster
-#' @param uniquePathways logical to use either unique Gene-set or Pathways approach. If FALSE unique Gene-sets.
-#' @param keywords_ora_inde a list with key words ora.
-#'
-#' @return plot
-#'
-#' @export
-#'
+
 setGeneric(name="PlotPathwayCluster",
            def=function(Object, doORA = TRUE, wordcloud = TRUE, uniquePathways = FALSE, keywords_ora_inde="")
            {
              standardGeneric("PlotPathwayCluster")
            }
 )
-
-#' PlotPathwayCluster
-#'
-#' @param Object a pathway object
-#' @param doORA boolean to perform ORA analysis
-#' @param wordcloud boolean to add wordcloud annotations of each cluster
-#' @param uniquePathways logical to use either unique Gene-set or Pathways approach. If FALSE unique Gene-sets.
-#'
-#' @return plot
-#'
-#' @examples
 
 setMethod(f="PlotPathwayCluster",
           signature = "PathwayObject",
@@ -54,7 +21,7 @@ setMethod(f="PlotPathwayCluster",
                                Object@cIndependentMethod[[1]][[1]]]
 
             # keywords_ora <- Object@functionalAnnotIndependent$Pathway$ORA
-            # 
+            #
             # keywords_ora <- lapply(keywords_ora, function (x)
             #   if (nchar(x@result$Description[1]) > 50) {
             #     paste0(substr(x@result$Description[1], 1, 40), "... ", x@result$ID[1])
@@ -76,7 +43,7 @@ setMethod(f="PlotPathwayCluster",
                                Object@cIndependentMethod[[1]][[1]]]
 
             # keywords_ora <- Object@functionalAnnotIndependent$Geneset$ORA
-            # 
+            #
             # keywords_ora <- lapply(keywords_ora, function (x)
             #                   if (nchar(x@result$Description[1]) > 50) {
             #                     paste0(substr(x@result$Description[1], 1, 40), "... ", x@result$ID[1])
@@ -84,7 +51,7 @@ setMethod(f="PlotPathwayCluster",
             #                     x@result$Description[1]
             #                   }
             #                 )
-            # 
+            #
             # term <- Object@functionalAnnotIndependent$Geneset$GO
 
             res <- obtainDefCluster(mat_cor)
@@ -136,16 +103,16 @@ setMethod(f="PlotPathwayCluster",
               df_cluster$Cluster <- gsub(10,"ten",df_cluster$Cluster)
               df_cluster$Cluster <- gsub(0,"",df_cluster$Cluster)
               df_cluster$Cluster <- gsub("ten",10,df_cluster$Cluster)
-              
+
             } else {
               df_cluster$Cluster <- gsub(0,"",df_cluster$Cluster)
             }
 
             #df_cluster$Cluster <- gsub(0,"",df_cluster$Cluster)
-            
+
             col_cluster <- list(Cluster = Object@plot$aka3IndependentUnique$Cluster)
             col_cluster$Cluster <- col_cluster$Cluster[-which(col_cluster$Cluster=="white")]
-            
+
             col_group <- list()
             for (i in colnames(df_metadata))
             {
@@ -154,17 +121,17 @@ setMethod(f="PlotPathwayCluster",
               tmp_vector <- list(i=tmp_vector)
               col_group <- append(col_group, tmp_vector)
             }
-            
+
             names(col_group) <- names(Object@plot$aka3Unique$Group)
-            
+
             annot_top <- HeatmapAnnotation(df=df_metadata, show_legend = F,
                                            col=col_group, annotation_name_gp = gpar(fontsize = 10))
             row_annot <- rowAnnotation(df=df_cluster, show_legend = T, col = col_cluster, na_col="white")
-            
+
             ht_opt$message <- FALSE
             color_fun <- colorRamp2(seq(min(mat_cor), max(mat_cor), length = 9),
                                     brewer.pal(9, "Reds"))
-            
+
             plot <- Heatmap(mat_cor, cluster_rows = F, cluster_columns = F,
                             show_row_names = F, show_column_names = F ,
                             name="Similarity", col=color_fun,
@@ -173,7 +140,7 @@ setMethod(f="PlotPathwayCluster",
 
             if (doORA == TRUE) {
               #legend <- Legend(labels = rep(paste0(1:length(keywords_ora), "- ", keywords_ora)),
-              # legend <- Legend(labels = keywords_ora_inde,                
+              # legend <- Legend(labels = keywords_ora_inde,
               #                  title = "\nORA", legend_gp = gpar(fill = Object@plot$aka3IndependentUnique$Cluster[!names(Object@plot$aka3IndependentUnique$Cluster)=="0"]),
               #                  nr=8,  title_position = "leftcenter-rot")
               legend <- suppressMessages(
@@ -193,27 +160,27 @@ setMethod(f="PlotPathwayCluster",
               # col_cluster$Cluster <- col_cluster$Cluster[-which(col_cluster$Cluster=="white")]
               # col_all <- list(Cluster = Object@plot$aka3Independent$Cluster,
               #                 Group = Object@plot$aka3Independent$Group)
-              # 
+              #
               # df_cluster <- as.data.frame(Object@plot$aka2Independent)
               # df_cluster$Cluster <- gsub(0,"",df_cluster$Cluster)
-            
+
               col_cluster <- list(Cluster = Object@plot$aka3Independent$Cluster)
               col_cluster$Cluster <- col_cluster$Cluster[-which(col_cluster$Cluster=="white")]
               col_all <- list(Cluster = Object@plot$aka3Independent$Cluster,
                               Group = Object@plot$aka3Independent$Group)
-              
+
               df_cluster <- as.data.frame(Object@plot$aka2Independent)
-              
+
               if (10 %in% df_cluster$Cluster) { #case there is 10 to not transform it into 1
                 df_cluster$Cluster <- gsub(10,"ten",df_cluster$Cluster)
                 df_cluster$Cluster <- gsub(0,"",df_cluster$Cluster)
                 df_cluster$Cluster <- gsub("ten",10,df_cluster$Cluster)
-                
+
               } else {
                 df_cluster$Cluster <- gsub(0,"",df_cluster$Cluster)
               }
-              
-              
+
+
               color_fun <- colorRamp2(seq(min(mat_cor), max(mat_cor), length = 9), brewer.pal(9, "Reds"))
               annot_top <- HeatmapAnnotation(df=df_cluster, show_legend = T,
                                              col = col_all,
@@ -221,22 +188,22 @@ setMethod(f="PlotPathwayCluster",
               row_annot <- rowAnnotation(df=df_cluster,
                                          show_legend = F, col = col_all,
                                          na_col="white")
-              
-              
+
+
               rowNumbers <- rowAnnotation(foo = anno_mark(at = unlist(lapply(align_to, function(x) round(mean(x)))),
                                                           labels = rep(paste0("Cluster ", 1:length(align_to))),
                                                           link_width = unit(0,"mm")))
-              
+
               plot <- Heatmap(matrix = mat_cor, cluster_rows = F, cluster_columns = F, show_row_names = F, show_column_names = F ,
                               name="Similarity", col=color_fun, top_annotation = annot_top, left_annotation = row_annot, right_annotation = annot_label) + rowNumbers
-              
-            
+
+
               if (doORA == TRUE) {
                 #legend <- Legend(labels = rep(paste0(1:length(keywords_ora), "- ", keywords_ora)),
-                # legend <- Legend(labels = keywords_ora_inde,  
+                # legend <- Legend(labels = keywords_ora_inde,
                 #                  title = "\nORA", legend_gp = gpar(fill = col_cluster$Cluster),
                 #                  nr=8,  title_position = "leftcenter-rot")
-                
+
                 legend <- suppressMessages(
                   Legend(labels = keywords_ora_inde,
                          title = "\nORA", legend_gp = gpar(fill = col_cluster$Cluster),

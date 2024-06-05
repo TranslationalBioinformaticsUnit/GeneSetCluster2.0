@@ -76,7 +76,6 @@ setGeneric(name="OptimalGeneSets",
 
 
 setMethod(f="OptimalGeneSets",
-          signature = "PathwayObject",
           definition = function(Object, uniquePathways=FALSE, cluster=NULL,
                                 method = "silhouette", max_cluster=24,
                                 cluster_method="kmeans", main = "")

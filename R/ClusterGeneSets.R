@@ -67,7 +67,6 @@ setGeneric(name="ClusterGeneSets",
 )
 
 setMethod(f="ClusterGeneSets",
-          signature = "PathwayObject",
           definition = function(Object, clusters = 3, method = "kmeans", order = "group",
                                 molecular.signature = "All", user_function=NA)
 {

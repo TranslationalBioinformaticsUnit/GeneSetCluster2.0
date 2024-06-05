@@ -1,5 +1,5 @@
 ---
-title: "GeneSetCluster 2.0: an upgraded comprehensive toolset for summarizing and integrating gene-sets analysis"
+title: "GeneSetCluster 2.0"
 author: "Asier Ortega-Legarreta, Alberto Maillo & Ewoud Ewing"
 date: "03/06/2024"
 output:
@@ -66,6 +66,38 @@ samples. All data was exported in tsv format.
 ## Pipeline
 
 ![Pipeline of the Package](img/Pipeline_new.jpg)
+
+## Quick start
+This is an example of the main functions of the package.
+
+```{r QuickStart, warning=FALSE, eval=FALSE}
+library(GeneSetCluster)
+# Loading from GSEA results files:
+GSEA.files <- c(system.file("extdata", "Covid19AI_Healthy_GSEA.csv",
+                            package = "GeneSetCluster"),
+               system.file("extdata", "Covid193Mo_Healthy_GSEA.csv",
+                            package = "GeneSetCluster"),
+               system.file("extdata", "Covid196Mo_Healthy_GSEA.csv",
+                            package = "GeneSetCluster"))
+
+file_1 <- read.csv(GSEA.files[1])
+file_2 <- read.csv(GSEA.files[2])
+file_3 <- read.csv(GSEA.files[3])
+
+object1 <- ObjectCreator(Pathways = c(file_1$ID, file_2$ID, file_3$ID),
+                             
+                         Molecules = c(file_1$core_enrichment, file_2$core_enrichment, file_3$core_enrichment),
+                         
+                         Groups = c(rep("AI",  times = nrow(file_1)),
+                                    rep("3Mo", times = nrow(file_2)),
+                                    rep("6Mo", times = nrow(file_3))),
+                         
+                         structure = "ENTREZID", Type="", sep="/", Source="GSEA", organism="org.Hs.eg.db")
+
+object2 <- CombineGeneSets(object1, threads = 1)
+object3 <- ClusterIndependentGeneSet(object2)
+plot <- PlotPathwayCluster(object3)
+```
 
 # Harmonization, loading the data
 
@@ -209,7 +241,7 @@ the labels can be compared.
 For investigate the metafiles check the experiment data and the metainfo
 to make sure that the PathwayObject matches your experiment(s).
 
-```{r Great with Background meta }
+```{r Great with Background meta, warning=FALSE}
 ShowExperimentdata(Object =Great.Object1)
 ShowMeta(Object = Great.Object1)
 ```
@@ -266,6 +298,38 @@ IPA.object1 <- LoadGeneSets(file_location = canonical.files,
 ```
 
 
+## Creating PathwayObject manually
+Sometimes the tool used for GSA is not available o we would like to create the object in a more specific way. For those cases we can create the PathwayObject manually. We only need to specify the pathway IDs, the genes, name of the groups, the structure, the separator used in genes, source and organism.
+
+
+```{r ObjectCreator, warning=FALSE}
+# Loading from GSEA results files:
+GSEA.files <- c(system.file("extdata", "Covid19AI_Healthy_GSEA.csv",
+                            package = "GeneSetCluster"),
+               system.file("extdata", "Covid193Mo_Healthy_GSEA.csv",
+                            package = "GeneSetCluster"),
+               system.file("extdata", "Covid196Mo_Healthy_GSEA.csv",
+                            package = "GeneSetCluster"))
+
+file_1 <- read.csv(GSEA.files[1])
+file_2 <- read.csv(GSEA.files[2])
+file_3 <- read.csv(GSEA.files[3])
+head(file_1$ID) # the pathway IDs
+head(file_1$core_enrichment, n = 1) # the genes, '/' as separator
+
+
+object1 <- ObjectCreator(Pathways = c(file_1$ID, file_2$ID, file_3$ID),
+                             
+                         Molecules = c(file_1$core_enrichment, file_2$core_enrichment, file_3$core_enrichment),
+                         
+                         Groups = c(rep("AI",  times = nrow(file_1)),
+                                    rep("3Mo", times = nrow(file_2)),
+                                    rep("6Mo", times = nrow(file_3))),
+                         
+                         structure = "ENTREZID", Type="", sep="/", Source="GSEA", organism="org.Hs.eg.db")
+
+```
+
 # Distance calculation, combining the gene-sets
 Following all the setup of the pathwayObject we can now combine and cluster the Gene-Sets. The CombineGeneSets function calculates the distance between Gene-Sets which is further used for clustering and seriation-based (cluster-independent) approach.
 
@@ -275,9 +339,9 @@ Briefly: In Gene Set Analysis (GSA), gene sets often overlap, causing redundancy
 
 The updated GeneSetCluster package addresses this with the "Unique Pathway" method, which treats gene sets with the same label as unique by combining their genes. This eliminates duplication, streamlines the analysis, and clarifies gene set distinctions. As a result, comparisons between studies are easier, and biological interpretations are more accurate, helping researchers identify key pathways and genes more precisely.
 
-    uniquePathway = FALSE: This option considers gene sets as they are, including any duplicates. This approach maintains the original structure of the gene sets without combining overlapping genes.
+- uniquePathway = FALSE: This option considers gene sets as they are, including any duplicates. This approach maintains the original structure of the gene sets without combining overlapping genes.
 
-    uniquePathway = TRUE: This option treats gene sets with the same label as unique by combining their genes. This eliminates duplication, streamlines the analysis, and clarifies gene set distinctions.
+- uniquePathway = TRUE: This option treats gene sets with the same label as unique by combining their genes. This eliminates duplication, streamlines the analysis, and clarifies gene set distinctions.
 
 These options allow researchers to choose between maintaining the original gene set structure or simplifying the analysis by eliminating redundancies. The threads parameter indicates the number of cores to use in order to parallelize.
 
@@ -376,22 +440,22 @@ If we want to use a specific seriation method, it can be specified with the **us
 So we will run the seriation-based approach.
 
 ```{r ClusterIndependentGeneSet1, warning=FALSE}
-GSEA.Object3.2 <- ClusterIndependentGeneSet(Object = GSEA.Object3.2,
-                                            use_method = NULL, nPathways = "optimal")
+GSEA.Object3 <- ClusterIndependentGeneSet(Object = GSEA.Object3,
+                                          use_method = NULL, nPathways = "optimal")
 ```
 
 Now we plot it using **PlotPathwayCluster** method, where as in the PlotGeneSets, we have to specify if we want to use the unique GeneSets or unique Pathway apporach, and the functional annotation to show. 
 
 ```{r PlotPathwayCluster1, warning=FALSE}
-p <- PlotPathwayCluster(GSEA.Object3.2, uniquePathways = FALSE, 
+p <- PlotPathwayCluster(GSEA.Object3, uniquePathways = FALSE, 
                         doORA = TRUE, wordcloud = TRUE)
 ```
 
 We can see that the selected seriation method arranges the distance matrix into clusters with high similarity. While the largest clusters are easily noted, some medium-sized ones may be more relevant. To annotate these, we can adjust the minimum number of gene sets needed to form a cluster using the **SetPathway** method.
 
 ```{r optimal number, warning=FALSE}
-paste0("Optimal minimum number of GeneSets to form a Cluster considering unique Gene-sets: ", GSEA.Object3.2@plot$aka3Independent$optimalNumberPathway)
-paste0("Optimal minimum number of GeneSets to form a Cluster considering unique Pathways: ", GSEA.Object3.2@plot$aka3IndependentUnique$optimalNumberPathway)
+paste0("Optimal minimum number of GeneSets to form a Cluster considering unique Gene-sets: ", GSEA.Object3@plot$aka3Independent$optimalNumberPathway)
+paste0("Optimal minimum number of GeneSets to form a Cluster considering unique Pathways: ", GSEA.Object3@plot$aka3IndependentUnique$optimalNumberPathway)
 ```
 
 Initially, we observe that the optimal minimum number for forming clusters is 8 when considering both unique gene sets and unique pathways. It's important to note that since different matrices are used for each approach, the optimal number may vary.
@@ -399,8 +463,8 @@ Initially, we observe that the optimal minimum number for forming clusters is 8 
 So we're going to set the minimum number of Genesets in 6 to annotate those clusters that are smaller. And plot it
 
 ```{r ClusterIndependentGeneSet after SetPathway, warning=FALSE, fig.height=10, fig.width=18}
-GSEA.Object3.2min6 <- SetPathway(GSEA.Object3.2, nPathways = 6)
-p <- PlotPathwayCluster(GSEA.Object3.2min6, uniquePathways = FALSE, 
+GSEA.Object3min6 <- SetPathway(GSEA.Object3, nPathways = 6)
+p <- PlotPathwayCluster(GSEA.Object3min6, uniquePathways = FALSE, 
                         doORA = TRUE, wordcloud = TRUE)
 ```
 
@@ -409,10 +473,10 @@ In this new results instead of having 5 clusters, we have 10, including smaller 
 Now we're going to explore the results considering unique Pathways and setting the minimum number of Pathways to 6.
 
 ```{r PlotPathwayCluster2, warning=FALSE, fig.height=10, fig.width=18}
-p <- PlotPathwayCluster(GSEA.Object3.2, uniquePathways = TRUE, 
+p <- PlotPathwayCluster(GSEA.Object3, uniquePathways = TRUE, 
                         doORA = TRUE, wordcloud = TRUE)
 
-p <- PlotPathwayCluster(GSEA.Object3.2min6, uniquePathways = TRUE, 
+p <- PlotPathwayCluster(GSEA.Object3min6, uniquePathways = TRUE, 
                         doORA = TRUE, wordcloud = TRUE)
 ```
 
@@ -420,8 +484,8 @@ p <- PlotPathwayCluster(GSEA.Object3.2min6, uniquePathways = TRUE,
 It is worth to mention that is posible to access to all the ORA and GO terms results of each cluster. In case we would like to explore them mor ein detail.
 
 ```{r accessing , warning=FALSE}
-head(GSEA.Object3.2@functionalAnnot$Geneset$ORA[[1]]) # each slot of the list refers to each cluster
-head(GSEA.Object3.2@functionalAnnot$Geneset$GO[[1]]) # each slot of the list refers to each cluster
+head(GSEA.Object3@functionalAnnot$Geneset$ORA[[1]]) # each slot of the list refers to each cluster
+head(GSEA.Object3@functionalAnnot$Geneset$GO[[1]]) # each slot of the list refers to each cluster
 ```
 
 
@@ -444,7 +508,7 @@ PlotGeneNetworks(GSEA.Object3, uniquePathways = TRUE, clusterIndependent = FALSE
 We can see how the Gene-sets within the same cluster are grouped and connected in the network. Increasing the value of RRmin makes us stricter with the minimum distance that two Gene-Sets must have to be connected. For example we will use a RRmin of 0.5.
 
 ```{r PlotGeneNetworks2, warning=FALSE}
-PlotGeneNetworks(GSEA.Object3.2, uniquePathways = TRUE, clusterIndependent = FALSE,
+PlotGeneNetworks(GSEA.Object3, uniquePathways = TRUE, clusterIndependent = FALSE,
              labels = FALSE, RRmin = 0.5)
 ```
 
@@ -453,7 +517,7 @@ These results are consistent with those we saw when plotting the heatmap with th
 Now we plot the seriation-based or cluster-independent approach. And increasing the RRmin.
 
 ```{r PlotGeneNetworks3, warning=FALSE}
-PlotGeneNetworks(GSEA.Object3.2, uniquePathways = TRUE, clusterIndependent = TRUE,
+PlotGeneNetworks(GSEA.Object3, uniquePathways = TRUE, clusterIndependent = TRUE,
              labels = FALSE, RRmin = 0.75)
 ```
 
@@ -461,8 +525,8 @@ PlotGeneNetworks(GSEA.Object3.2, uniquePathways = TRUE, clusterIndependent = TRU
 GeneSetCluster allows the option to extract genes belonging to clusters. Again we must take into account whether we want the genes considering unique GeneSets or Pathways and the type of clustering. 
 
 ```{r GenesPerGeneSet, warning=FALSE}
-head(GenesPerGeneSet(Object = GSEA.Object3.2, uniquePathways = FALSE, clusterIndependent = FALSE))
-head(GenesPerGeneSet(Object = GSEA.Object3.2, uniquePathways = TRUE, clusterIndependent = TRUE))
+head(GenesPerGeneSet(Object = GSEA.Object3, uniquePathways = FALSE, clusterIndependent = FALSE))
+head(GenesPerGeneSet(Object = GSEA.Object3, uniquePathways = TRUE, clusterIndependent = TRUE))
 
 ```
 
@@ -472,18 +536,18 @@ Using the TissueExpressionPerGeneSet function, we can see which tissues the gene
 
 We can wither specified the specific tissues we want to study or choose all of them. Also GeneSetCluster connects to an API to obtain the data, but also there is the possibility to run the analysis locally downloading the database.
 
-Link of the database: ADD LINK!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Link of downloading the database: https://figshare.com/articles/dataset/TissueDatabase/25965664
 
 When we run the method we need to specify to do the enrichment either in the data where we perform classic (clusterIndependent = FALSE) or seriation-based clustering (clusterIndependent = TRUE). 
 
 ```{r TissueExpressionPerGeneSet, warning=FALSE}
-GSEA.Object3.2 <- TissueExpressionPerGeneSet(Object=GSEA.Object3.2, clusterIndependent = TRUE, tissues = c("Lung", "Nerve...Tibial", "Whole.Blood", "Liver", "Brain...Amygdala", "Breast...Mammary.Tissue", "Heart...Atrial.Appendage", "Stomach", "Thyroid"))     
+GSEA.Object3 <- TissueExpressionPerGeneSet(Object=GSEA.Object3, clusterIndependent = TRUE, tissues = c("Lung", "Nerve...Tibial", "Whole.Blood", "Liver", "Brain...Amygdala", "Breast...Mammary.Tissue", "Heart...Atrial.Appendage", "Stomach", "Thyroid"))     
 ```
 
 We will plot it using **PlotTissueExpression** method. 
 
 ```{r PlotTissueExpression1, warning=FALSE, fig.width=8}
-PlotTissueExpression(GSEA.Object3.2, clusterIndependent = T, uniquePathways = T) 
+PlotTissueExpression(GSEA.Object3, clusterIndependent = T, uniquePathways = T) 
 ```
 
 In this plot, we can see the number of genes in each cluster, how enriched each cluster is in the selected tissues, and the total sum of all clusters for each tissue.
@@ -491,7 +555,7 @@ In this plot, we can see the number of genes in each cluster, how enriched each 
 We also have an argument to show us the Z-scores so that we can visualize it in a better way, in the cases that we are enriching in many genes. 
 
 ```{r PlotTissueExpression2, warning=FALSE, fig.width=8}
-PlotTissueExpression(GSEA.Object3.2, clusterIndependent = T, uniquePathways = T, showZscore = TRUE) 
+PlotTissueExpression(GSEA.Object3, clusterIndependent = T, uniquePathways = T, showZscore = TRUE) 
 ```
 
 ## STRINGdb analysis
@@ -500,11 +564,35 @@ STRINGdb is a comprehensive database providing crucial information on protein-pr
 Firstly, we will perform the protein-protein interaction analysis. Again we must take into account whether we want the genes considering unique GeneSets or Pathways and the type of clustering.
 
 ```{r GetSTRINGdbPerGeneSets, warning=FALSE}
-GSEA.Object3.2 <- GetSTRINGdbPerGeneSets(GSEA.Object3.2, clusterIndependent = T, uniquePathways = T) 
+GSEA.Object3 <- GetSTRINGdbPerGeneSets(GSEA.Object3, clusterIndependent = T, uniquePathways = T) 
 ```
 
 For plotting we need to specify the cluster we want to plot. 
 
 ```{r plotSTRINGdbPerGeneSets, warning=FALSE}
-plotSTRINGdbPerGeneSets(GSEA.Object3.2, plot.cluster = 4) 
+plotSTRINGdbPerGeneSets(GSEA.Object3, plot.cluster = 4) 
 ```
+
+
+# Shiny Application
+
+This new version introduces a robust and intuitive Shiny application, designed to accommodate new users, particularly clinicians and biologists with no/limited bioinformatics experience. This user-friendly application is hosted on shinyappserver, and alternatively, it can be installed locally.
+
+In the web version, researchers can upload their gene-sets analysis results in a variety of formats (.txt, .xlsx, and .csv) or use the provided Excel template for convenience. Upon selecting essential input fields, such as handling duplicated gene-sets, the default analysis begins applying classic clustering (details in Supplementary Material). The resulting output includes comprehensive clustering information, ORA analysis details for each cluster, gene frequency per cluster, and informative plots illustrating the distance matrix and cluster summaries. 
+
+Additionally, the Shiny application supports the uploading of GeneSetCluster object created in the R package, enabling users to continue their analysis online. Likewise, analysis initiated in the app can be exported and continued in the R package. 
+
+[Online version link](https://translationalbio.shinyapps.io/genesetcluster/)
+
+To run the shiny application.
+```{r run_app, warning=FALSE, eval=FALSE}
+run_app()
+```
+
+![Shiny application example](img/screenshop_shiny.jpg)
+
+
+
+
+
+

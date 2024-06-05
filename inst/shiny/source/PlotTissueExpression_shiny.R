@@ -1,65 +1,10 @@
-#' PlotTissueExpression
-#'
-#' Plots a the tissue expression total median expression per tissue and the percentage of each cluster in each tissue
-#' @import patchwork
-#' @import ggplot2
-#' @import reshape2
-#' @import RColorBrewer
-#'
-#' @param Object a pathway object
-#' @param all boolean to add all tissues
-#' @param showZscore boolean to show Z score per cluster and in total
-#'
-#' @return plot
-#'
-#' @export
-#'
+
 setGeneric(name="PlotTissueExpression",
            def=function(Object, all = FALSE, uniquePathways=FALSE, clusterIndependent=FALSE, showZscore=FALSE)
            {
              standardGeneric("PlotTissueExpression")
            }
 )
-
-#' PlotTissueExpression
-#'
-#' @param Object a pathway object
-#' @param all boolean to add all tissues
-#'
-#' @return plot
-#'
-#' @examples
-#' Great.files <- c(system.file("extdata", "MM10.GREAT.KO.uGvsMac.bed.tsv",
-#'                              package = "GeneSetCluster"),
-#' system.file("extdata", "MM10.GREAT.KO.uGvsMac.bed_BCKGRND.tsv", package = "GeneSetCluster"),
-#' system.file("extdata", "MM10.GREAT.WT.uGvsMac.bed.tsv", package = "GeneSetCluster"),
-#' system.file("extdata", "MM10.GREAT.WT.uGvsMac.bed_BCKGRND.tsv", package = "GeneSetCluster"))
-#' Great.files.bckgrnd <- Great.files[grepl("BCKGRND", Great.files)]
-#'
-#'
-#' Great.bckgnrd.Object1 <- LoadGeneSets(file_location = Great.files.bckgrnd,
-#'                                       groupnames= c("KO", "WT"),
-#'                                       P.cutoff = 0.05,
-#'                                       Mol.cutoff = 5,
-#'                                       Source = "Great",
-#'                                       Great.Background = TRUE,
-#'                                       type = "Canonical_Pathways",
-#'                                     topranks = 20,
-#'                                    structure = "SYMBOL",
-#'                                    Organism = "org.Mm.eg.db",
-#'                                    seperator = ",")
-#' man.Great.Object1 <- ManageGeneSets(Object = Great.bckgnrd.Object1,
-#'                                    keep.type =c("Disease Ontology",
-#'                                    "GO Biological Process" ),
-#'                                    exclude.type="")
-#' man.Great.Object2 <- CombineGeneSets(Object = man.Great.Object1)
-#' man.Great.Object3 <- ClusterGeneSets(Object = man.Great.Object2,
-#'                                      clusters = 5,
-#'                                      method = "kmeans")
-#'
-#' man.Great.Object4 <- TissueExpressionPerGeneSet(man.Great.Object3)
-#' PlotTissueExpression(man.Great.Object4, all = F)
-
 
 setMethod(f="PlotTissueExpression",
           signature = "PathwayObject",

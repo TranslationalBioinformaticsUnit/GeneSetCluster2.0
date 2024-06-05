@@ -1,14 +1,3 @@
-#' GenesPerGeneSet
-#'
-#' @importFrom limma strsplit2
-#'
-#' Extracts a data.frame from the object with every gene in per cluster
-#' @param Object a PathwayObject
-#'
-#' @return dataframe of pathwayobjects
-#' @export
-#'
-
 setGeneric(name="GenesPerGeneSet",
            def=function(Object, uniquePathways=FALSE, clusterIndependent=FALSE)
            {
@@ -16,42 +5,6 @@ setGeneric(name="GenesPerGeneSet",
            }
 )
 
-#' GenesPerGeneSet
-#'
-#' @param Object a PathwayObject
-#' @param PathwayObject  a PathwayObject
-#'
-#' @return dataframe of pathwayobjects
-#' @export
-#'
-#' @examples
-#' IPA.files <- c(system.file("extdata",
-#'                            "MM10.IPA.KO.uGvsMac.Canonical_pathways.xls",
-#'                             package = "GeneSetCluster"),
-#'              system.file("extdata",
-#'                             "MM10.IPA.WT.uGvsMac.Canonical_pathways.xls",
-#'                              package = "GeneSetCluster"),
-#'              system.file("extdata",
-#'                              "MM10.IPA.KO.uGvsMac.Functional_annotations.xls",
-#'                              package = "GeneSetCluster"),
-#'              system.file("extdata",
-#'                              "MM10.IPA.WT.uGvsMac.Functional_annotations.xls",
-#'                              package = "GeneSetCluster"))
-#' canonical.files <- IPA.files[grep("Canonical", IPA.files)]
-#'
-#' IPA.object1 <- LoadGeneSets(file_location = canonical.files,
-#'                          groupnames= c("KO", "WT"),
-#'                          P.cutoff = 1.3,
-#'                          Mol.cutoff = 5,
-#'                          Source = "IPA",
-#'                          type = "Canonical_Pathways",
-#'                          structure = "SYMBOL",
-#'                          seperator = ",")
-#'IPA.object2 <- CombineGeneSets(Object = IPA.object1)
-#'IPA.object3 <- ClusterGeneSets(Object = IPA.object2,
-#'                               clusters = 7,
-#'                               method = "kmeans")
-#' GenesPerGeneSet(Object =IPA.object3 )
 setMethod(f="GenesPerGeneSet",
           signature="PathwayObject",
           definition=function(Object, uniquePathways=FALSE, clusterIndependent=FALSE)
@@ -137,13 +90,13 @@ setMethod(f="GenesPerGeneSet",
             mol.unique.df <- as.data.frame(matrix(0, nrow = length(unique.mol), ncol = length(clus.mol.ls)))
             rownames(mol.unique.df) <- unique.mol
             colnames(mol.unique.df) <-  paste(unique(use_cluster), sep="")
-            
+
             for(clus.i in forIteration)
             {
               mol.unique.df[clus.mol.ls[[clus.i]],clus.i] <- 1
             }
-            
-            
+
+
             mol.unique.df <- mol.unique.df[, order(as.numeric(colnames(mol.unique.df)), decreasing = F)]
             colnames(mol.unique.df) <-  paste("Cluster_", colnames(mol.unique.df), sep="")
 

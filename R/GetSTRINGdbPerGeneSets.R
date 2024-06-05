@@ -62,7 +62,6 @@ setGeneric(name="GetSTRINGdbPerGeneSets",
 )
 
 setMethod(f="GetSTRINGdbPerGeneSets",
-          signature = "PathwayObject",
           definition = function(Object, uniquePathways=FALSE, clusterIndependent=FALSE,
                                 plot.input="All", threshold = 100, version = "12")
           {

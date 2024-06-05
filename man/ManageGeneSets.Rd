@@ -20,26 +20,25 @@ a pathwayobject
 Filter unwanted groups from the PathwayObject
 }
 \examples{
+# Loading from GREAT webtool results files:
 Great.files <- c(system.file("extdata", "MM10.GREAT.KO.uGvsMac.bed.tsv",
                              package = "GeneSetCluster"),
-system.file("extdata", "MM10.GREAT.KO.uGvsMac.bed_BCKGRND.tsv", package = "GeneSetCluster"),
-system.file("extdata", "MM10.GREAT.WT.uGvsMac.bed.tsv", package = "GeneSetCluster"),
-system.file("extdata", "MM10.GREAT.WT.uGvsMac.bed_BCKGRND.tsv", package = "GeneSetCluster"))
-Great.files.bckgrnd <- Great.files[grepl("BCKGRND", Great.files)]
+                 system.file("extdata", "MM10.GREAT.WT.uGvsMac.bed.tsv",
+                             package = "GeneSetCluster"))
 
 
-Great.bckgnrd.Object1 <- LoadGeneSets(file_location = Great.files.bckgrnd,
-                                      groupnames= c("KO", "WT"),
-                                      P.cutoff = 0.05,
-                                      Mol.cutoff = 5,
-                                      Source = "Great",
-                                      Great.Background = TRUE,
-                                      type = "Canonical_Pathways",
-                                    topranks = 20,
-                                   structure = "SYMBOL",
-                                   Organism = "org.Mm.eg.db",
-                                   seperator = ",")
-man.Great.Object1 <- ManageGeneSets(Object = Great.bckgnrd.Object1,
+Great.Object1 <- LoadGeneSets(file_location = Great.files,
+                              groupnames= c("KO", "WT"),
+                              P.cutoff = 0.05,
+                              Mol.cutoff = 10,
+                              Source = "Great",
+                              Great.Background = FALSE,
+                              type = "Canonical_Pathways",
+                              topranks = 20,
+                              structure = "SYMBOL",
+                              Organism = "org.Mm.eg.db",
+                              seperator = ",")
+man.Great.Object1 <- ManageGeneSets(Object = Great.Object1,
                                    keep.type =c("Disease Ontology",
                                    "GO Biological Process" ),
                                    exclude.type="")

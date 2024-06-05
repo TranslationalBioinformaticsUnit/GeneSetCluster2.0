@@ -56,7 +56,6 @@ setGeneric(name="ClusterIndependentGeneSet",
 )
 
 setMethod(f="ClusterIndependentGeneSet",
-          signature = "PathwayObject",
           definition = function(Object, use_method = NULL, nPathways = "optimal")
           {
             message("Performing the estimation for all the pathways...\n")

@@ -5,6 +5,7 @@
 #'
 #' @import factoextra
 #' @import network
+#' @import sna
 #' @importFrom GGally ggnet2
 #'
 #' @param Object A PathwayObject.

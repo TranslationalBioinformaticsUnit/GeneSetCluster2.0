@@ -1,48 +1,3 @@
-#' OptimalGeneSets_2
-#'
-#' Calculate distances between the different experiments.
-#' @import clustree
-#' @import cluster
-#' @import factoextra
-#' @import GGally
-#'
-#' @param object A PathwayObject.
-#' @param method Which method to determing optimal number of clusters. gap, elbow or silhouette.
-#' @param max_cluster Max number of clusters to test
-#' @param cluster_method kmeans or hcut. Which clustering method is used
-#' @param main A string to be used as title in the plot
-#' @param uniquePathways Boolean to merge or not unique pathways
-#'
-#' @return a plot
-#'
-#' @examples
-#'
-#'require(GeneSetCluster)
-#'IPA.files <- c(system.file("extdata", "MM10.IPA.KO.uGvsMac.Canonical_pathways.xls",
-#'               package = "GeneSetCluster"),
-#'               system.file("extdata", "MM10.IPA.WT.uGvsMac.Canonical_pathways.xls",
-#'               package = "GeneSetCluster"),
-#'               system.file("extdata", "MM10.IPA.KO.uGvsMac.Functional_annotations.xls",
-#'               package = "GeneSetCluster"),
-#'               system.file("extdata", "MM10.IPA.WT.uGvsMac.Functional_annotations.xls",
-#'               package = "GeneSetCluster"))
-#'canonical.files <- IPA.files[grep("Canonical", IPA.files)]
-#'
-#'IPA.object1 <- LoadGeneSets(file_location = canonical.files, #where are  the files
-#'                            groupnames= c("KO", "WT"),
-#'                            P.cutoff = 1.3,
-#'                            Mol.cutoff = 5,
-#'                            Source = "IPA",
-#'                            type = "Canonical_Pathways",
-#'                            structure = "SYMBOL",
-#'                            seperator = ",")
-#'IPA.object2 <- CombineGeneSets(Object = IPA.object1)
-#'OptimalGeneSets_2(object = IPA.object2, method = "elbow", max_cluster= 24,
-#'                cluster_method = "kmeans", main= "Kmeans for 24 clusters")
-#'
-#' @export
-#'
-#'
 OptimalGeneSets_2 <- function(object, method, max_cluster, cluster_method, main, uniquePathways)
 {
 
@@ -68,7 +23,7 @@ OptimalGeneSets_2 <- function(object, method, max_cluster, cluster_method, main,
   }else{
     RR<-object@Data.RR
   }
-  
+
   if(method == "elbow")
   {
     plot.x <-   fviz_nbclust(RR, get(cluster_method), method = "wss", k.max = max_cluster) +ggtitle(paste(main,": The Elbow method",sep=""))

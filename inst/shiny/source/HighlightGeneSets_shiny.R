@@ -1,48 +1,3 @@
-#' HighlightGeneSets_shiny
-#'
-#' Adds a highlight score if the Gene-Set overlaps with a gene subset which is supplied by the user.
-#'
-#' @param Object A PathwayObject.
-#' @param highligt.genes A vector with genes from the subset the user is interested in. e.g. a list of ROS genes.
-#' @param name The name of the subset which will be added to the score calculated.
-#'
-#' @return a pathwayobject
-#' @export
-#'
-#' @examples
-#' IPA.files <- c(system.file("extdata",
-#'                            "MM10.IPA.KO.uGvsMac.Canonical_pathways.xls",
-#'                             package = "GeneSetCluster"),
-#'              system.file("extdata",
-#'                             "MM10.IPA.WT.uGvsMac.Canonical_pathways.xls",
-#'                              package = "GeneSetCluster"),
-#'              system.file("extdata",
-#'                              "MM10.IPA.KO.uGvsMac.Functional_annotations.xls",
-#'                              package = "GeneSetCluster"),
-#'              system.file("extdata",
-#'                              "MM10.IPA.WT.uGvsMac.Functional_annotations.xls",
-#'                              package = "GeneSetCluster"))
-#' canonical.files <- IPA.files[grep("Canonical", IPA.files)]
-#'
-#' IPA.object1 <- LoadGeneSets(file_location = canonical.files,
-#'                          groupnames= c("KO", "WT"),
-#'                          P.cutoff = 1.3,
-#'                          Mol.cutoff = 5,
-#'                          Source = "IPA",
-#'                          type = "Canonical_Pathways",
-#'                          structure = "SYMBOL",
-#'                          seperator = ",")
-#' IPA.object2 <- CombineGeneSets(Object = IPA.object1)
-#'
-#' IPA.object3 <- ClusterGeneSets(Object = IPA.object2,
-#'                               clusters = 12,
-#'                               method = "kmeans")
-#' system.file("data", "Redox.genes.rda", package = "testdat")
-#' IPA.object3.highlight <- HighlightGeneSets_shiny(Object = IPA.object3,
-#'                                           highligt.genes = Redox.genes,
-#'                                           name = "Ros")
-#'
-
 HighlightGeneSets_shiny <- function(Object, highligt.genes, name = "Ros", genesinfo=NULL)
 {
   message("[=========================================================]")
@@ -61,7 +16,7 @@ HighlightGeneSets_shiny <- function(Object, highligt.genes, name = "Ros", genesi
   message(paste( "raw data has " , length(unique(highligt.genes))," highligt.genes", sep=""))
   highligt.genes <- toupper(highligt.genes)
   message(paste( "Transformed data has " , length(unique(highligt.genes))," highligt.genes", sep=""))
-  
+
 
   ################################################
   #-----------Seperate per cluster---------------#
@@ -89,7 +44,7 @@ HighlightGeneSets_shiny <- function(Object, highligt.genes, name = "Ros", genesi
         #y <- sum(highligt.genes %in% toupper(genes.df$SYMBOL))
         y <- sum(highligt.genes %in% toupper(symbolgenes))
       }
-      
+
       highligt.score[genes.cl.i] <- y/length(genes.x)
     }
     DF.cl$Highlight <- highligt.score
@@ -134,12 +89,12 @@ HighlightGeneSets_shiny <- function(Object, highligt.genes, name = "Ros", genesi
   #   col.ramp.highlight <- colorRampPalette(c("skyblue", "lightblue","grey","grey85","grey95", "white"))
   # }else{
   #   col.ramp.highlight <- colorRampPalette(c("lightblue","grey","grey85","grey95", "white"))
-  # 
+  #
   # }
   # Pal.highlight <- col.ramp.highlight(101)
   # pal.hightlight <- Pal.highlight[Cols.hightlight]
-  # 
-  # 
+  #
+  #
   # Object@plot$aka2$Highlight <- (Cols.hightlight-1)
   # Pal.highlight <- unique(pal.hightlight)
   # names(Pal.highlight) <- unique((Cols.hightlight-1))

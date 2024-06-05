@@ -1,20 +1,3 @@
-#' TissueExpressionPerGeneSet
-#'
-#' Extracts every gen of every cluster from the object. Using the median gene expression from the GTEx database build a data.frame with every tissue per cluster.
-#'
-#' @import jsonlite
-#' @import httr
-#' @import reshape2
-#' @import dplyr
-#' @import utils
-#' @import pbapply
-#'
-#' @param Object a PathwayObject
-#' @param localDatabase data frame with the GTEx database information
-#' @param uniquePathways  a boolean
-#'
-#' @return dataframe of pathwayobjects with tissue expression per cluster
-#'
 
 setGeneric(name="TissueExpressionPerGeneSet",
            def=function(Object, tissues="ALL", localDatabase=NULL, dic=NULL, clusterIndependent=FALSE, uniquePathways=F)
@@ -23,43 +6,7 @@ setGeneric(name="TissueExpressionPerGeneSet",
            }
 )
 
-#' TissueExpressionPerGeneSet
-#'
-#' @param Object a PathwayObject
-#' @param localDatabase data frame with the GTEx database information
-#' @param uniquePathways  a boolean
-#'
-#' @return dataframe of pathwayobjects with tissue expression per cluster
-#' @export
-#'
-#' @examples
-#' #' IPA.files <- c(system.file("extdata",
-#'                            "MM10.IPA.KO.uGvsMac.Canonical_pathways.xls",
-#'                             package = "GeneSetCluster"),
-#'              system.file("extdata",
-#'                             "MM10.IPA.WT.uGvsMac.Canonical_pathways.xls",
-#'                              package = "GeneSetCluster"),
-#'              system.file("extdata",
-#'                              "MM10.IPA.KO.uGvsMac.Functional_annotations.xls",
-#'                              package = "GeneSetCluster"),
-#'              system.file("extdata",
-#'                              "MM10.IPA.WT.uGvsMac.Functional_annotations.xls",
-#'                              package = "GeneSetCluster"))
-#' canonical.files <- IPA.files[grep("Canonical", IPA.files)]
-#'
-#' IPA.object1 <- LoadGeneSets(file_location = canonical.files,
-#'                          groupnames= c("KO", "WT"),
-#'                          P.cutoff = 1.3,
-#'                          Mol.cutoff = 5,
-#'                          Source = "IPA",
-#'                          type = "Canonical_Pathways",
-#'                          structure = "SYMBOL",
-#'                          seperator = ",")
-#' IPA.object2 <- CombineGeneSets(Object = IPA.object1)
-#' IPA.object3 <- ClusterGeneSets(Object = IPA.object2,
-#'                               clusters = 7,
-#'                               method = "kmeans")
-#' IPA.object4 <- TissueExpressionPerGeneSet(Object = IPA.object3, threads = 8)
+
 setMethod(f="TissueExpressionPerGeneSet",
           signature="PathwayObject",
           definition=function(Object, tissues="ALL", localDatabase=NULL, dic=NULL, clusterIndependent=FALSE, uniquePathways=F)
@@ -79,19 +26,19 @@ setMethod(f="TissueExpressionPerGeneSet",
 
           # data("dic", package = "GeneSetCluster")
           # data("availableTissues", package = "GeneSetCluster")
-          # 
+          #
           # if (checkTissues(tissues, tissue_names))
           # {
           #   if (tissues[1] == "ALL")
           #   {
           #     tissues <- tissue_names
           #     message("\nSelected ALL tissues.\n")
-          # 
+          #
           #   } else {
           #     message("Selected tissues:\n")
           #     show_tissues <- lapply(tissues, function(x) paste0(x, "\n"))
           #     message(show_tissues)
-          # 
+          #
           #   }
           # } else {
           #   tissue_names <- lapply(tissue_names, function(x) paste0(x, "\n"))
@@ -119,7 +66,7 @@ setMethod(f="TissueExpressionPerGeneSet",
           # meltedtousePathway <- genestissuePathway[[1]]
           # tousePathway <- genestissuePathway[[2]]
 
-          
+
           tryCatch({
             #localDatabase_use <- localDatabase[tissues]
             message("Performing GSEA for unique Gene-sets...\n")

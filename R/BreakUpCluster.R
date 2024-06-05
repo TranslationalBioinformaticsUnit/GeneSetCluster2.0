@@ -58,7 +58,6 @@ setGeneric(name="BreakUpCluster",
 )
 
 setMethod(f="BreakUpCluster",
-          signature = "PathwayObject",
           definition = function(Object = Object, breakup.cluster=1, sub.cluster=3, uniquePathways=FALSE)
 {
 

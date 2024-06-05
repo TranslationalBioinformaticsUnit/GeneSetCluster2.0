@@ -56,7 +56,6 @@ setGeneric(name="HighlightGeneSets",
 )
 
 setMethod(f="HighlightGeneSets",
-          signature="PathwayObject",
           definition=function(Object, highligt.genes, name = "",
                               clusterIndependent = FALSE)
 {

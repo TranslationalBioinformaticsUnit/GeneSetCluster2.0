@@ -1,49 +1,3 @@
-#' LoadGeneSets_shiny
-#'
-#' Automatic loader for gene sets from the IPA and Great tools.
-#'
-#' @import readxl
-#' @import limma
-#' @import stringr
-#' @importFrom utils read.csv write.table
-#' @param file_location A location string in a vector.
-#' @param groupnames A vector with group names of the different gene set experiments
-#' @param P.cutoff numeric Pvalue cutoff for filtering.
-#' @param Mol.cutoff numeric value for minimum number of molecules.
-#' @param Source Tool used to generate gene sets.
-#' @param Great.Background If the Great tool was used, did the user supply a background.
-#' @param type For IPA data if "Canonical_Pathways" or "Functional_annotations" were supplied.
-#' @param topranks numeric with the number of ranks per group to be loaded, usefull when there is a lot of data.
-#' @param structure The structure of the genes. is it SYMBOLS, ENSEMBL, NCBI etc. Used for converting when there is mutiple structure in the object.
-#' @param Organism the package name for the human or mouse data, used for converting the gene structure. name of the package, currently org.Hs.eg.db and org.Mm.eg.db supported.
-#' @param seperator A character used within in the string to seperate genes
-#'
-#' @return a pathwayobject
-#'
-#' @examples
-#' Great.files <- c(system.file("extdata", "MM10.GREAT.KO.uGvsMac.bed.tsv",
-#'                              package = "GeneSetCluster"),
-#' system.file("extdata", "MM10.GREAT.KO.uGvsMac.bed_BCKGRND.tsv", package = "GeneSetCluster"),
-#' system.file("extdata", "MM10.GREAT.WT.uGvsMac.bed.tsv", package = "GeneSetCluster"),
-#' system.file("extdata", "MM10.GREAT.WT.uGvsMac.bed_BCKGRND.tsv", package = "GeneSetCluster"))
-#' Great.files.bckgrnd <- Great.files[grepl("BCKGRND", Great.files)]
-#'
-#'
-#' Great.bckgnrd.Object1 <- LoadGeneSets_shiny(file_location = Great.files.bckgrnd,
-#'                                       groupnames= c("KO", "WT"),
-#'                                       P.cutoff = 0.05,
-#'                                       Mol.cutoff = 5,
-#'                                       Source = "Great",
-#'                                       Great.Background = TRUE,
-#'                                       type = "Canonical_Pathways",
-#'                                     topranks = 20,
-#'                                    structure = "SYMBOL",
-#'                                    Organism = "org.Mm.eg.db",
-#'                                    seperator = ",")
-
-#'
-#'
-#' @export
 LoadGeneSets_shiny <- function(file_location = canonical.files,
                          groupnames= c("MClust_1", "MClust_26", "MClust_3457"),
                          P.cutoff = 1.3,
@@ -317,7 +271,7 @@ LoadGeneSets_shiny <- function(file_location = canonical.files,
 
 
   }
-  
+
   ######################################
   ##----------GSEA--------------------##
   ######################################
@@ -334,7 +288,7 @@ LoadGeneSets_shiny <- function(file_location = canonical.files,
     list.canonical <- list()
     for(i in 1:length(file_location))
     {
-      
+
       message("File input from GSEA. Please, all GO supposed to be Biological Process")
       if((length(grep("xls", file_location[i]))>0)||(length(grep("xlsx", file_location[i]))>0)){
         Canonical.x <-read_excel(file_location[i], col_names=TRUE)
@@ -351,14 +305,14 @@ LoadGeneSets_shiny <- function(file_location = canonical.files,
       list.canonical[[i]] <- as.data.frame(Canonical.x)
       names(list.canonical)[i] <- groupnames[i]
     }
-    
+
     ###########################################
     ##---------filter for cutoff-------------##
     ###########################################
     list.canonical.f <- list()
     file.locations.2 <- vector()
     message("Loading Splitting GSEA types passing cutoff")
-    
+
     possibleSeparators<-c(",","/",";")
 
     for(i in 1:length(file_location))
@@ -378,32 +332,32 @@ LoadGeneSets_shiny <- function(file_location = canonical.files,
       }
       list.canonical[[i]] <- list.canonical[[i]][as.numeric(as.character(list.canonical[[i]]$p.adjust)) <= P.cutoff,]
       split.idx <- names(table(list.canonical[[i]]$X..Ontology))[table(list.canonical[[i]]$X..Ontology) > 0]
-      
+
       if(length(split.idx) == 0)
       {
         message(paste(groupnames[i], " has 0 pathways passing cutoff, suggest trying lower cutoff", sep=""))
         return(groupnames[i])
         stop()
       }else{
-        
+
         #split per type
         Great.Data.ls <- list()
         for(list.ii in 1:length(split.idx))
         {
           Canonical.x <- list.canonical[[i]][list.canonical[[i]]$X..Ontology == split.idx[list.ii],]
-          
+
           if(!topranks == "")
           {
             if(nrow(Canonical.x) > topranks){
               Canonical.x <- Canonical.x[1:topranks,]
             }
           }
-          
+
           Great.Data <- matrix(NA, nrow=nrow(Canonical.x), ncol = 7)
           colnames(Great.Data) <- c("Pathways", "Molecules", "Groups","Type", "Pval", "Ratio", "MoleculesCount")
           Great.Data <- as.data.frame(Great.Data)
-          
-          
+
+
           if(is.null(list.canonical[[i]]$enrichmentScore)){
             #enrichGO output data
             Great.Data$Molecules <- as.character(Canonical.x$geneID)
@@ -419,21 +373,21 @@ LoadGeneSets_shiny <- function(file_location = canonical.files,
             Great.Data$MoleculesCount <- str_count(as.character(Canonical.x$core_enrichment), separator)+1
             Great.Data$Ratio <- as.numeric(as.character(Canonical.x$rank))/Great.Data$MoleculesCount
           }
-          
+
           Great.Data$Pathways <- as.character(Canonical.x$ID)
           Great.Data$Groups <- groupnames[i]
           Great.Data$Type <- split.idx[list.ii]
           Great.Data$Pval <- as.character(Canonical.x$p.adjust)
-   
+
           Great.Data.ls[[list.ii]] <- Great.Data
           names(Great.Data.ls)[list.ii] <- paste(groupnames[i], split.idx[list.ii],sep="_")
-          
+
         }
         file.locations.1 <- rep(file_location[i], times = length(split.idx))
         file.locations.2 <- c(file.locations.2, file.locations.1)
         list.canonical.f <- do.call(c, list(list.canonical.f, Great.Data.ls))
       }
-      
+
     }
     ####################################
     ##---------Pheno data-------------##
@@ -442,11 +396,11 @@ LoadGeneSets_shiny <- function(file_location = canonical.files,
     colnames(Pdata) <- c("Groupnames", "Length", "file_location")
     rownames(Pdata) <- paste("Experiment",1:length(list.canonical.f), sep="_" )
     Pdata <- as.data.frame(Pdata)
-    
+
     Pdata[,"Groupnames"] <- strsplit2(x = names(list.canonical.f), split = "_")[,1]
     Pdata[,"Length"] <- sapply(list.canonical.f, nrow)
     Pdata[,"file_location"] <- file.locations.2
-    
+
     ###################################
     ##---------Meta data-------------##
     ###################################
@@ -455,7 +409,7 @@ LoadGeneSets_shiny <- function(file_location = canonical.files,
                             "cluster.method", "highlight", "order.group", "loaded", "display", "mol.signature")
     rownames(metadata) <- paste("Experiment",1:length(list.canonical.f), sep="_" )
     metadata <- as.data.frame(metadata)
-    
+
     metadata[,"source"] <- rep(Source, times = nrow(Pdata))
     metadata[,"type"] <-  strsplit2(x = names(list.canonical.f), split = "_")[,2]
     metadata[,"structure"] <- rep(structure, times = nrow(Pdata))
@@ -466,8 +420,8 @@ LoadGeneSets_shiny <- function(file_location = canonical.files,
     metadata[,"seperator"] <- rep(seperator, times = nrow(Pdata))
     metadata[,"display"] <- rep("Condensed", times = nrow(Pdata))
     metadata[,"mol.signature"] <- rep("All", times = nrow(Pdata))
-    
-  }  
+
+  }
   ######################################
   ##---------Combine data-------------##
   ######################################
