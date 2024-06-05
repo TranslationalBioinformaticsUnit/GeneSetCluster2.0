@@ -5,7 +5,7 @@ Version: 2.0
 Authors@R: c(person("Asier", "Ortega-Legarreta", role = c("aut","cre"),  
            email = "aortegal@navarra.es", 
            comment = c(ORCID = "0009-0000-3563-5362")),
-           person("Alberto", "Maillo", role = c("aut", "cre"),  
+           person("Alberto", "Maillo", role = c("aut"),  
            email = "alberto.ruizdeinfante@kaust.edu.sa"),
            person("Ewoud", "Ewing", role = c("aut"),  
            email = "ewoud.ewing@ki.se"))
