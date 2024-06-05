@@ -1,4 +1,4 @@
-# GeneSetCluster 2.0 <img src="www/GeneSetCluster_newLogo.png" width="200" align="right"/>
+# GeneSetCluster 2.0 <img src="inst/shiny/www/GeneSetCluster_newLogo.png"/>
 
 This repository contains the code and data of the R-based tool GeneSetCluster2.0 for summarizing and integrating results from gene-set analyses (GSA). For further details, we recommend you read the corresponding articles.
 * [Summary](#summary)
