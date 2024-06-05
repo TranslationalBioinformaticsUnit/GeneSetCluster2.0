@@ -60,6 +60,9 @@ The Shiny application can be executed locally after the package is installed by 
 GeneSetCluster::run_app()
 ```
 
+![Screenshot of the Shiny Application](vignettes/img/screenshop_shiny.jpg)
+
+
 ## Resources and Documentation
 
 * Tissue database for performing tissue enrichment analysis: [https://figshare.com/articles/dataset/TissueDatabase/25965664](https://figshare.com/articles/dataset/TissueDatabase/25965664)
