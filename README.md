@@ -15,7 +15,7 @@ A new version 2.0, of [GeneSetCluster](https://github.com/TranslationalBioinform
 
 This package is available for **R version 4.3 or higher**. 
 
-First, all dependencies must be properly installed. This script checks and installs the necessary libraries: [Rpackage_libraries.R](inst/exdata/Rpackage_libraries.R).
+First, all dependencies must be properly installed. This script checks and installs the necessary libraries: [Rpackage_libraries.R](https://github.com/TranslationalBioinformaticsUnit/GeneSetCluster2.0/blob/main/inst/extdata/Rpackage_libraries.R).
 
 To easily install GeneSetCluster, use the following code:
 ```
