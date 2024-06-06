@@ -64,9 +64,9 @@ GeneSetCluster::run_app()
 
 
 ## Resources and Documentation
-
+* [Vignette can be found here.](https://github.com/TranslationalBioinformaticsUnit/GeneSetCluster2.0/blob/main/inst/extdata/GeneSetCluster_vignette.html)
 * Tissue database for performing tissue enrichment analysis: [https://figshare.com/articles/dataset/TissueDatabase/25965664](https://figshare.com/articles/dataset/TissueDatabase/25965664)
-* The shiny application is hosted at: [https://translationalbio.shinyapps.io/genesetcluster/](https://translationalbio.shinyapps.io/genesetcluster/)
+* The Shiny Application is hosted at: [https://translationalbio.shinyapps.io/genesetcluster/](https://translationalbio.shinyapps.io/genesetcluster/)
 * Schema of GeneSetCluster2.0:
 
 ![Schema of GeneSetCluster2.0](vignettes/img/Pipeline_new.png)
