@@ -17,5 +17,6 @@
 
 run_app <- function()
 {
-  shiny::runApp("inst/shiny/app.R")
+  path <- system.file("shiny", "app.R", package = "GeneSetCluster")
+  shiny::runApp(path)
 }
