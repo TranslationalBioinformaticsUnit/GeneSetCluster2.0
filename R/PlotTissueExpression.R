@@ -248,8 +248,6 @@ setMethod(f="PlotTissueExpression",
     }
 
 
-    message("[You may want to plot the cluster tissue expression using PlotClusterTissueExpression next.]")
-
     return(finalPlot)
 }
 )

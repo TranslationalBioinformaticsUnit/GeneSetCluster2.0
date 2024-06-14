@@ -94,9 +94,12 @@ object1 <- ObjectCreator(Pathways = c(file_1$ID, file_2$ID, file_3$ID),
                          
                          structure = "ENTREZID", Type="", sep="/", Source="GSEA", organism="org.Hs.eg.db")
 
-object2 <- CombineGeneSets(object1, threads = 1)
-object3 <- ClusterIndependentGeneSet(object2)
-plot <- PlotPathwayCluster(object3)
+object2 <- CombineGeneSets(object1, threads = 2)
+object3 <- ClusterIndependentGeneSet(object3)
+object3min7 <- SetPathway(object3, nPathways = 7)
+object3min6 <- SetPathway(object3, nPathways = 6)
+
+plot <- PlotPathwayCluster(object3min7, uniquePathways = T)
 ```
 
 # Harmonization, loading the data
