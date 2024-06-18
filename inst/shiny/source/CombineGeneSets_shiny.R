@@ -1,4 +1,4 @@
-CombineGeneSets <- function(Object, combineMethod="Standard", combineMethod.supplied, display="Condensed", threads=1)
+CombineGeneSets_shiny <- function(Object, combineMethod="Standard", combineMethod.supplied, display="Condensed", threads=1)
 {
   message("[=========================================================]")
   message("[<<<<            CombineGeneSets START               >>>>>]")

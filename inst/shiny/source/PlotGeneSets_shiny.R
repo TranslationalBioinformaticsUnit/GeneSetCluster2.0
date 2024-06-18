@@ -1,4 +1,4 @@
-setGeneric(name="PlotGeneSets",
+setGeneric(name="PlotGeneSets_shiny",
            def=function(Object,
                         uniquePathways = F,
                         doORA = T,
@@ -12,12 +12,12 @@ setGeneric(name="PlotGeneSets",
                         cluster.order = "",
                         keywords_ora="")
            {
-             standardGeneric("PlotGeneSets")
+             standardGeneric("PlotGeneSets_shiny")
            }
 )
 
-setMethod(f="PlotGeneSets",
-          signature="PathwayObject",
+
+setMethod(f="PlotGeneSets_shiny",
           definition=function(Object,
                               uniquePathways = F,
                               doORA = T,
@@ -194,7 +194,7 @@ setMethod(f="PlotGeneSets",
               if (doORA == TRUE) {
                 legend <- Legend(labels = keywords_ora,
                                  title = "\nORA", legend_gp = gpar(fill = Object@plot$aka3$Cluster[order(names(Object@plot$aka3$Cluster))]),
-                                 nr=8,  title_position = "leftcenter-rot")
+                                 nr=length(Object@plot$aka3$Cluster[order(names(Object@plot$aka3$Cluster))]),  title_position = "leftcenter-rot")
 
                 mergedplot <- draw(plot, annotation_legend_list=legend, annotation_legend_side = "bottom")
               } else {
@@ -245,7 +245,7 @@ setMethod(f="PlotGeneSets",
                 #legend <- Legend(labels = rep(paste0(1:length(keywords_ora), "- ", keywords_ora)),
                 legend <- Legend(labels = keywords_ora,
                                  title = "\nORA", legend_gp = gpar(fill = Object@plot$aka3Unique$Cluster[order(names(Object@plot$aka3Unique$Cluster))]),
-                                 nr=8,  title_position = "leftcenter-rot")
+                                 nr=length(Object@plot$aka3Unique$Cluster[order(names(Object@plot$aka3Unique$Cluster))]),  title_position = "leftcenter-rot")
 
                 mergedplot <- draw(plot, annotation_legend_list=legend, annotation_legend_side = "bottom")
               } else {

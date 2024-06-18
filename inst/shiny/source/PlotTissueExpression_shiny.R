@@ -1,13 +1,12 @@
-
-setGeneric(name="PlotTissueExpression",
+setGeneric(name="PlotTissueExpression_shiny",
            def=function(Object, all = FALSE, uniquePathways=FALSE, clusterIndependent=FALSE, showZscore=FALSE)
            {
-             standardGeneric("PlotTissueExpression")
+             standardGeneric("PlotTissueExpression_shiny")
            }
 )
 
-setMethod(f="PlotTissueExpression",
-          signature = "PathwayObject",
+
+setMethod(f="PlotTissueExpression_shiny",
           definition = function(Object, all=FALSE, uniquePathways=FALSE, clusterIndependent=FALSE, showZscore=FALSE)
   {
 

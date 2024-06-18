@@ -1,13 +1,13 @@
-setGeneric(name="ClusterIndependentGeneSet",
+
+setGeneric(name="ClusterIndependentGeneSet_shiny",
            def=function(Object, iterations = 3, use_method = NULL, all_methods = FALSE, nPathways = "optimal", uniquePathways = FALSE)
            {
-             standardGeneric("ClusterIndependentGeneSet")
+             standardGeneric("ClusterIndependentGeneSet_shiny")
            }
 )
 
 
-setMethod(f="ClusterIndependentGeneSet",
-          signature = "PathwayObject",
+setMethod(f="ClusterIndependentGeneSet_shiny",
           definition = function(Object, iterations = 3, use_method = NULL, all_methods = FALSE, nPathways = "optimal", uniquePathways = FALSE)
           {
 
@@ -27,7 +27,7 @@ setMethod(f="ClusterIndependentGeneSet",
             #Object@cIndependentMethod <- list(ordergo, ordergounique)
             Object@cIndependentMethod <- list(ordergo)
 
-            Object <- SetPathway(Object, nPathways = nPathways, uniquePathways = uniquePathways)
+            Object <- SetPathway_shiny(Object, nPathways = nPathways, uniquePathways = uniquePathways)
 
 
             return(Object)

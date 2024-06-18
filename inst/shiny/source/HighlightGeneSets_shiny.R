@@ -1,7 +1,7 @@
 HighlightGeneSets_shiny <- function(Object, highligt.genes, name = "Ros", genesinfo=NULL)
 {
   message("[=========================================================]")
-  message("[<<<<<             HighlightGeneSets_shiny start            >>>>>>]")
+  message("[<<<<<             HighlightGeneSets start            >>>>>>]")
 
   if(is.na(unique(Object@metadata[,"cluster.method"])))
   {
@@ -105,7 +105,7 @@ HighlightGeneSets_shiny <- function(Object, highligt.genes, name = "Ros", genesi
 
 
   message("-----------------------------------------------------------")
-  message("[<<<<<             HighlightGeneSets_shiny END              >>>>>>]")
+  message("[<<<<<             HighlightGeneSets END              >>>>>>]")
   message("[=========================================================]")
   return(Object)
 }

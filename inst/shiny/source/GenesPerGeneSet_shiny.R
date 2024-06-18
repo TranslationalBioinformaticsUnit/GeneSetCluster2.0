@@ -1,12 +1,11 @@
-setGeneric(name="GenesPerGeneSet",
+setGeneric(name="GenesPerGeneSet_shiny",
            def=function(Object, uniquePathways=FALSE, clusterIndependent=FALSE)
            {
-             standardGeneric("GenesPerGeneSet")
+             standardGeneric("GenesPerGeneSet_shiny")
            }
 )
 
-setMethod(f="GenesPerGeneSet",
-          signature="PathwayObject",
+setMethod(f="GenesPerGeneSet_shiny",
           definition=function(Object, uniquePathways=FALSE, clusterIndependent=FALSE)
           {
             message("[=============================================================]")

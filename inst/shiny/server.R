@@ -1,6 +1,48 @@
+library(ggplotify)
+library(tools)
+library(GO.db)
+library(powerjoin)
+library(imputeTS)
+library(htmltools)
+library(shinyFiles)
+library(shiny)
+library(shinydashboard)
+library(shinyBS)
+library(shinythemes)
+library(DT)
+library(ggplot2)
+library(shinyjs)
+library(reshape2)
+library(clusterProfiler)
+library(factoextra)
+library(GGally)
+library(shinyWidgets)
+library(org.Hs.eg.db)
+library(org.Mm.eg.db)
+library(dplyr)
+library(limma)
+library(stringr)
+library(shinyalert)
+library(jsonlite)
+library(doParallel)
+library(parallel)
+library(httr)
+library(utils)
+library(readxl)
+library(pbapply)
+library(RColorBrewer)
+library(patchwork)
+library(grid)
+library(simplifyEnrichment)
+library(ggwordcloud)
+library(ComplexHeatmap)
+library(colorRamp2)
+library(shinybusy)
+library(bigstatsr)
+library(seriation)
+
 #Load R scripts
-source("source/PlotTree.R")
-source("source/PlotGeneSets.R")
+source("source/PlotGeneSets_shiny.R")
 source("source/PathwayObject.R")
 source("source/LoadGeneSets_shiny.R")
 source("source/HighlightGeneSets_shiny.R")
@@ -9,19 +51,15 @@ source("source/PlotTissueExpression_shiny.R")
 source("source/GenesPerGeneSet_shiny.R")
 source("source/OptimalGeneSets_shiny.R")
 source("source/internalFunctions.R")
-source("source/CombineGeneSets.R")
-source("source/ManageGeneSets.R")
-source("source/ClusterGeneSets.R")
+source("source/CombineGeneSets_shiny.R")
+source("source/ManageGeneSets_shiny.R")
+source("source/ClusterGeneSets_shiny.R")
 source("source/BreakUpCluster_shiny.R")
 source("source/ClusterIndependentGeneSet_shiny.R")
 source("source/PlotPathwayCluster_shiny.R")
 source("source/ShowPathwayCluster_shiny.R")
 source("source/SetPathway_shiny.R")
-
-###########
-#VERSION 28
-###########
-
+#LOAD DATABASES
 load("databases/hpoDatabase.RData")
 load("databases/mpDatabase.RData")
 
@@ -53,7 +91,6 @@ calculateORA<-function(object, cluster, uniquePathways){
   }else{
     clustersvector<-object@plot$aka2$Cluster
   }
-  #genes<-as.vector(unlist(sapply(strsplit(object@Data[[1]][,"Molecules"][object@plot$aka2$Cluster==cluster],object@metadata$seperator[1]),unique)))
   genes<-as.vector(unlist(sapply(strsplit(object@Data[[1]][,"Molecules"][clustersvector==cluster],object@metadata$seperator[1]),unique)))
   genes<-unique(gsub(" ","", genes))
   ora<-enrichGO(gene = genes, OrgDb = object@metadata[1,"organism"], keyType = object@metadata[1,"structure"], ont="BP", pvalueCutoff = 0.05, qvalueCutoff = 0.2, readable=TRUE)
@@ -74,12 +111,27 @@ calculateKeywordsORA<-function(ora){
     group_by(Cluster) %>%
     slice(1) %>%
     ungroup() %>% select(2)
-
+  
   return(as.list(first_rows$Description))
 }
 
 topORA<-function(ora, cluster, top){
   return(head(ora[ora$Cluster==paste("Cluster_",cluster,sep=""),],top))
+}
+
+extractORAinfo <- function(df_list, independent) {
+  merged_df <- do.call(rbind, lapply(seq_along(df_list), function(i) {
+    df <- df_list[[i]]
+    df$Cluster <- paste("Cluster_", i, sep = "")
+    df[,c(5,6,7)]<-round(df[,c(5,6,7)], 3)
+    if(independent){
+      return(df[1:10, -8])
+    }else{
+      return(df[1:20, -8])
+    }
+    
+  }))
+  return(merged_df)
 }
 
 calculateORAindependent<-function(object, cluster, independent_info, uniquePathways){
@@ -94,7 +146,7 @@ calculateORAindependent<-function(object, cluster, independent_info, uniquePathw
       pathway_cluster<-object@Data[[1]][,"RR_name"] %in% paste(independent_info$Group[independent_info$Cluster==cluster],independent_info$ID[independent_info$Cluster==cluster],sep="_")
     }else{
       pathway_cluster<-object@Data[[1]][,"RR_name"] %in% paste(independent_info$Group[independent_info$Cluster==cluster],independent_info$Pathways[independent_info$Cluster==cluster],sep="_")
-    }
+    } 
   }
   genes<-as.vector(unlist(sapply(strsplit(object@Data[[1]][,"Molecules"][pathway_cluster],object@metadata$seperator[1]),unique)))
   genes<-unique(gsub(" ","", genes))
@@ -110,6 +162,118 @@ calculateORAindependent<-function(object, cluster, independent_info, uniquePathw
   colnames(oratop10)[9]<-"Cluster"
   return(oratop10)
 }
+
+#This function performs the ora per cluster from a given object
+PerformORAGOperCluster_shiny <- function(Object, uniquePathways, clusterIndependent)
+{
+  
+  go_id_list_new <- obtainGOidList_shiny(Object, uniquePathways, clusterIndependent)
+  #cluster-seriation based
+  if (clusterIndependent)
+  {
+    clusters <- length(go_id_list_new)
+    clus <- vector()
+    for (i in 1:clusters) {
+      paths <- c(rep(i, length(go_id_list_new[[i]])))
+      names(paths) <- go_id_list_new[[i]]
+      clus <- c(clus, paths)
+    }
+    #cluster-classic
+  } else {
+    if (uniquePathways)
+    {
+      clus <- Object@plot$aka2Unique$Cluster
+      names(clus) <- rownames(Object@plot$aka2Unique)
+      clusters <- length(go_id_list_new)
+    } else {
+      clus <- Object@Data[[1]]$cluster
+      names(clus) <- Object@Data[[1]]$Pathways
+      clusters <- length(go_id_list_new)
+    }
+  }
+  
+  message("\nPerforming Semantic enrichment per cluster...")
+  if (checkGO(Object) == FALSE) {
+    message("No GO terms have been detected in the pathways. The semantic enrichment word cloud will not be generated.")
+    wordcloud <- FALSE
+    term <- NULL
+  } else {
+    #adapted from anno_word_cloud_from_GO function
+    env_tdm_GO <- readRDS(system.file("extdata", "tdm_GO.rds", package = "simplifyEnrichment"))
+    names(go_id_list_new) <- as.character(1:length(go_id_list_new))
+    
+    # keyword enrichment
+    message(paste0("Performing keyword enrichment for "), length(go_id_list_new), " group(s) of pathways.")
+    term <- lapply(go_id_list_new, function(x, min_stat=5) {
+      df <- keywordEnrichment(x, env_tdm_GO)
+      df <- df[df$p <= min_stat, , drop = FALSE]
+      data.frame(df[, 1], -log10(df$p))
+    })
+  }
+  
+  return(list(GO=term))
+  
+}
+obtainGOidList_shiny <- function(Object, uniquePathways, clusterIndependent)
+{
+  #cluster-seriation-based
+  if (clusterIndependent)
+  {
+    if (uniquePathways)
+    {
+      mat_sym <- scaleCorMatrix(Object@DataPathways.RR)
+      mat_cor <- mat_sym[Object@cIndependentMethod[[1]][[1]],
+                         Object@cIndependentMethod[[1]][[1]]]
+      
+      res <- obtainDefCluster(mat_cor)
+     
+      go_id_list <- res[which(lapply(res,
+                                     function(x) length(x))>=getOptimalNumber(res))]
+      
+    } else {
+      mat_sym <- scaleCorMatrix(Object@Data.RR)
+      mat_cor <- mat_sym[Object@cIndependentMethod[[1]][[1]],
+                         Object@cIndependentMethod[[1]][[1]]]
+      
+      res <- obtainDefCluster(mat_cor)
+      go_id_list <- res[which(lapply(res,
+                                     function(x) length(x))>=getOptimalNumber(res))]
+      go_id_list_new <- go_id_list
+    }
+    
+    
+    if (uniquePathways)
+    {
+      go_id_list_new <- go_id_list
+    } else {
+      go_id_list_new <- list()
+      for (i in 1:length(go_id_list)) {
+        go_id_list_new[[i]] <- Object@Data[[1]]$Pathways[Object@Data[[1]]$RR_name %in% go_id_list[[i]]]
+      }
+    }
+    
+    #cluster-classic
+  } else {
+    if(uniquePathways == F)
+    {
+      clus <- Object@Data[[1]]$cluster
+      names(clus) <- Object@Data[[1]]$Pathways
+    }else{
+      clus <- Object@plot$aka2Unique$Cluster
+      names(clus) <- rownames(Object@plot$aka2Unique)
+    }
+    go_id_list <- list()
+    for (z in unique(clus))
+    {
+      go_id_list[[z]] <- names(clus[clus==z])
+    }
+    go_id_list_new <- go_id_list
+    
+  }
+  
+  return(go_id_list_new)
+}
+
 
 getterm<- function(goid){
   termid<-GOTERM[[goid]]
@@ -136,7 +300,6 @@ createBarPlot <- function(object, clustername, uniquePathways) {
   df<-as.data.frame(object@Data[[1]]$Groups[object@Data[[1]]$cluster==clustername])
   names(df)<-"Groups"
   df$Groups<-factor(df$Groups, levels=names(category_counts))
-  #ylim_value <- max(category_counts) + 40
   title<-paste(clustername, " (Terms=", total, ")", sep = "")
   # Create a ggplot barplot
   ggplot(df, aes(x = Groups, fill = Groups)) +
@@ -165,7 +328,6 @@ createBarPlotIndependent <- function(object, combined_result, grouping, uniquePa
   df<-as.data.frame(combined_result$Group[combined_result$Cluster==grouping])
   names(df)<-"Groups"
   df$Groups<-factor(df$Groups, levels=names(category_counts))
-  #ylim_value <- max(category_counts) + 40
   title<-paste(grouping, " (Terms=", total, ")", sep = "")
   # Create a ggplot barplot
   ggplot(df, aes(x = Groups, fill = Groups)) +
@@ -181,7 +343,7 @@ createBarPlotIndependent <- function(object, combined_result, grouping, uniquePa
 
 
 transferinfo<-function(Object) {
-  canonical.df<-Object@Data[[1]]
+  canonical.df<-Object@Data[[1]] 
   #add in index column
   canonical.df$index<-seq_len(nrow(canonical.df))
   canonical.df_2<-Object@plot$aka2Unique
@@ -192,9 +354,8 @@ transferinfo<-function(Object) {
   # Order the result by the original index
   result <- result[order(result$index), ]
   all(Object@Data[[1]]$Pathways==result$Pathways)
-  #Object@Data[[1]]$cluster<-result$Cluster
   Object@Data[[1]]$cluster<-paste("Cluster_",result$Cluster, sep="")
-
+  
   #return updated object
   return(Object)
 }
@@ -249,11 +410,14 @@ calculategenestableinde<-function(Object, independent_info) {
   clusters<-unique(independent_info$Cluster)
   clusters<-clusters[order(clusters)]
   independent_info<-cbind(independent_info, paste(independent_info$Group,independent_info[,1], sep="_"))
-  colnames(independent_info)[5]<-"RR_name"
+  if(checkGO(Object)){
+    colnames(independent_info)[5]<-"RR_name"
+  }else{
+    colnames(independent_info)[4]<-"RR_name"
+  }
   independent_info_molecules<-merge(independent_info, Object@Data[[1]][,c("RR_name", "Molecules")], by="RR_name", all.x=TRUE)
   j<-1
   for (i in clusters){
-    #genes<-as.vector(unlist(sapply(strsplit(Object@Data[[1]][,"Molecules"][clustersvector==i],Object@metadata$seperator[1]),unique)))
     genes<-as.vector(unlist(sapply(strsplit(independent_info_molecules$Molecules[independent_info_molecules$Cluster==i],Object@metadata$seperator[1]),unique)))
     genes<-gsub(" ","", genes)
     #count duplication per gene
@@ -274,27 +438,27 @@ calculategenestableinde<-function(Object, independent_info) {
   return(as.data.frame(genesFinal))
 }
 
-# Define server function
+# Define server function  
 server <- function(input, output, session) {
 
   hideTab(inputId = "tabs3", target = "tabpanelresult")
   shinyjs::hide("summary.independentgroup")
-
+    
   data.object<-reactive({})
   independent.info<-reactive({})
   independent.infoORA<-reactive({})
   genesfinal.info<-reactive({})
 
   output$tissueIntro<-renderUI({tags$p("Choose specific tissues for performing enrichment analysis (the tissues were selected from", HTML("<a href='https://gtexportal.org/home/' target='_blank'>here</a>"), "):")})
-
+  
   output$independentIntro<-renderUI({tags$p("Press the buttom below to run the seriation-based analysis:")})
-
+  
   ###########################
   ###########################
   # Store uploaded files
   files <- reactiveVal(list())
   files_data_group <- reactiveValues(group=NULL)
-
+  
   observeEvent(input$files, {
     new_files <- input$files
     current_files <- files()
@@ -304,7 +468,7 @@ server <- function(input, output, session) {
       files(new_files)
     }
   })
-
+  
   # Create DataTable of uploaded files
   output$fileTable <- renderDT({
     if (length(unlist(files())) > 0){
@@ -335,7 +499,7 @@ server <- function(input, output, session) {
         Delete = '<button class="btn btn-danger btn-sm">Delete</button>',
         stringsAsFactors = FALSE
       )
-
+      
       datatable(
         files_data,
         escape = FALSE,
@@ -352,7 +516,7 @@ server <- function(input, output, session) {
       NULL
     }
   })
-
+  
   # Delete selected files
   observeEvent(input$fileTable_cell_clicked, {
     info <- input$fileTable_cell_clicked
@@ -362,7 +526,7 @@ server <- function(input, output, session) {
       files_data_group$group<-files_data_group$group[-info$row]
     }
   })
-
+  
   # Observe changes in the DataTable and update the reactive value
   observeEvent(input$fileTable_cell_edit, {
     info <- input$fileTable_cell_edit
@@ -373,13 +537,13 @@ server <- function(input, output, session) {
       }
     }
   })
-
-
+  
+  
   ###########################
   ###########################
   #ANNOTATIONS GO
   annotations<-reactive({})
-
+  
   dataInfo_previousvalue<-reactiveVal("none")
   oraInfo_previousvalue<-reactiveVal("none")
   independentOutput_previousvalue<-reactiveVal("none")
@@ -391,7 +555,6 @@ server <- function(input, output, session) {
     #Data table
     if (!is.null(input$dataInfo_cell_clicked$col)){
       if (input$dataInfo_cell_clicked$col==0){
-        #if(input$dataInfo_cell_clicked$value!=""){
         if((input$dataInfo_cell_clicked$value!="")&&(input$dataInfo_cell_clicked$value!=dataInfo_previousvalue())){
           dataInfo_previousvalue(input$dataInfo_cell_clicked$value)
           js$browseURL(paste("https://www.ebi.ac.uk/QuickGO/term/",input$dataInfo_cell_clicked$value, sep=""))
@@ -401,7 +564,6 @@ server <- function(input, output, session) {
     #ORA table
     if (!is.null(input$oraInfo_cell_clicked$col)){
       if (input$oraInfo_cell_clicked$col==0){
-        #if(input$oraInfo_cell_clicked$value!=""){
         if((input$oraInfo_cell_clicked$value!="")&&(input$oraInfo_cell_clicked$value!=oraInfo_previousvalue())){
           oraInfo_previousvalue(input$oraInfo_cell_clicked$value)
           js$browseURL(paste("https://www.ebi.ac.uk/QuickGO/term/",input$oraInfo_cell_clicked$value, sep=""))
@@ -421,7 +583,6 @@ server <- function(input, output, session) {
     #Independent ORA table
     if (!is.null(input$independentORAOutput_cell_clicked$col)){
       if (input$independentORAOutput_cell_clicked$col==0){
-        #if(input$oraInfo_cell_clicked$value!=""){
         if((input$independentORAOutput_cell_clicked$value!="")&&(input$independentORAOutput_cell_clicked$value!=oraInfo_previousvalue())){
           oraInfo_previousvalue(input$independentORAOutput_cell_clicked$value)
           js$browseURL(paste("https://www.ebi.ac.uk/QuickGO/term/",input$independentORAOutput_cell_clicked$value, sep=""))
@@ -455,21 +616,21 @@ server <- function(input, output, session) {
       }
     }
   })
-
+  
   ###########################
   ###########################
-  #CLEAR
+  #RELOAD
   observeEvent(input$reset, {
     runexample(FALSE)
     shinyjs::runjs("location.reload(true);")
   })
-
-
+  
+  
   ###########################
   ###########################
   #RUN EXAMPLE
   runexample<- reactiveVal(FALSE)
-
+  
   observeEvent(input$setExample, {
     runexample(TRUE)
     if (input$exampledataset=="mousedataset"){
@@ -477,7 +638,7 @@ server <- function(input, output, session) {
       updateRadioButtons(session,"gene.id", selected = "SYMBOL")
       updateRadioButtons(session,"organism", selected = "org.Mm.eg.db")
       updateRadioButtons(session,"filters", selected = "none")
-
+      
       tablegroup<-cbind(c("MM10.GREAT.KO.uGvsMac.bed.tsv", "MM10.GREAT.WT.uGvsMac.bed.tsv"), c("KO", "WT"))
       colnames(tablegroup)<-c("File","Group")
     }
@@ -486,54 +647,45 @@ server <- function(input, output, session) {
       updateRadioButtons(session,"gene.id", selected = "ENTREZID")
       updateRadioButtons(session,"organism", selected = "org.Hs.eg.db")
       updateRadioButtons(session,"filters", selected = "uniquepathways")
-
+      
       tablegroup<-cbind(c("Covid19AI_Healthy.csv", "Covid193Mo_Healthy.csv", "Covid196Mo_Healthy.csv"), c("AI", "Mo3", "Mo6"))
       colnames(tablegroup)<-c("File","Group")
     }
-
+    
     output$fileTable<-renderDataTable(datatable(tablegroup, rownames=FALSE, editable=TRUE, options=list(pageLength=25, dom='t')))
-
+    
     click("printResults")
   })
-
+  
   wordcloudperform<-reactiveVal(FALSE)
   wordcloudinfo<-reactive({})
+  wordcloudinfoIndependent<-reactive({})
   uniquepathwaysperform<-reactiveVal(FALSE)
-  observe({
-    if (!is.null(input$filters)&&(!runexample())){
-      #if((input$filters=="uniquepathways")&&(!runexample())){
-      if((input$filters=="uniquepathways")){
-        uniquepathwaysperform(TRUE)
-      }else{
-        uniquepathwaysperform(FALSE)
-      }
-    }
-  })
 
+  
   ###########################
   ###########################
-  #CALCULATE RESULTS (including duplicates, clustering=hierarchival and number of cluster=5)
-  treeplotoutput<-reactive({})
+  #RUN GENESET PIPELINE 
   heatmapoutput<-reactive({})
   tissueoutput<-reactive({})
   tissueoutputindependent<-reactive({})
   independentoutput<-reactive({})
-
+  
   ora.object<-reactive({})
   ora.objectALL<-reactive({})
-
+  
   genes.symbolinfo<-reactive({})
-
+  
   observeEvent(input$printResults, {
-
-
+    
+    
     tocontinue=TRUE
     if(((is.null(input$source))||(is.null(input$files))||(is.null(input$gene.id))||(is.null(input$organism)))&&(!runexample())){
       shinyalert(title = "Missing inputs", text = "Please, all the inputs are mandatory.", type = "error")
     }else{
-
+      
       if(runexample()){
-        #LOAD GREAT MOUSE EXAMPLE
+        #LOAD EXAMPLE
         show_modal_progress_line(text="Running example")
         if (input$exampledataset=="mousedataset"){
           load("example/GSC_examplemouse.RData")
@@ -544,6 +696,8 @@ server <- function(input, output, session) {
         annotations<<-reactive({annotations_to_save})
         ora.objectALL<<-reactive({ora_to_save})
         uniquepathwaysperform<<-reactive({unique_pathways})
+        wordcloudinfo<<-reactive({wordcloudinfo})
+        wordcloudinfoIndependent<<-reactive({wordcloudinfoIndependent})
         update_modal_progress(value=0.3)
         if(uniquepathwaysperform()){
           clusterchoices<-paste("Cluster_", names(data.object()@plot$aka3Unique$Cluster), sep="")
@@ -558,7 +712,7 @@ server <- function(input, output, session) {
           clusterchoices_all<-c("Uncheck all", clusterchoices)
           checkboxGroupInput("optionCluster", label = "", choices=clusterchoices_all, selected = clusterchoices, inline=TRUE)
         })
-
+        
         #genes info
         genesFinal<-calculategenestable(data.object(), uniquepathwaysperform())
         if(unique(as.character(data.object()@metadata[,"structure"]))!="SYMBOL"){
@@ -571,21 +725,20 @@ server <- function(input, output, session) {
                                            %>% formatStyle(colnames(genesFinal)[1], color = "blue"))
         oraResultsTop<-do.call("rbind", lapply(clusters, topORA, ora=ora.objectALL(), top=as.integer(input$top)))
         ora.object<<-reactive({oraResultsTop})
-
-
+        
+        
         ##check if tissue is perfomed for dependent analysis
         if ((!is.null(data.object()@dfTissue))&&(length(data.object()@dfTissue>0))){
-
+          
           tissueData<-data.frame(rownames(data.object()@dfTissue), data.object()@dfTissue)
           colnames(tissueData)[1]<-"Tissue"
           output$tissueOutput<-renderDataTable(datatable(tissueData, rownames = FALSE, options = list(searching=TRUE, pageLength=10)))
-          #shinyjs::hide("calculateTissueEnrichment")
-
+          
           output$tissueIntro<-renderUI({tags$p("Tissue enrichment results per cluster (Cluster_number..number of terms):")})
           showTab(inputId = "tabs", target = "Tissue")
-
+          
           #plot tissue plots
-          tissueoutput<<-reactive({PlotTissueExpression(data.object(), all = FALSE, uniquePathways=uniquepathwaysperform(), clusterIndependent=FALSE)})
+          tissueoutput<<-reactive({PlotTissueExpression_shiny(data.object(), all = FALSE, uniquePathways=uniquepathwaysperform(), clusterIndependent=FALSE)})
           output$tissuePlot<-renderPlot(tissueoutput())
         }else{
           #hide tissue results
@@ -611,7 +764,7 @@ server <- function(input, output, session) {
         output$independentORAOutput<-renderDataTable(datatable(independent.infoORA(), rownames = FALSE, options = list(autoWidth=TRUE, scrollX=TRUE, scrollY=400, searching=TRUE, pageLength=10, rowCallback = JS(underlineCellsCols(c(1),c(0)))))
                                                      %>% formatStyle(colnames(independent.infoORA())[9], backgroundColor = styleEqual(c(paste("Cluster_", names(data.object()@plot[[6]]$Cluster)[names(data.object()@plot[[6]]$Cluster)!=0], sep="")), c(data.object()@plot[[6]]$Cluster[data.object()@plot[[6]]$Cluster!="white"])))
                                                      %>% formatStyle(colnames(independent.infoORA())[1], color = "blue"))
-
+        
         genesFinalIndependent<-calculategenestableinde(data.object(),independent.info())
         if(unique(as.character(data.object()@metadata[,"structure"]))!="SYMBOL"){
           genesFinalIndependent<-combineSymbolInfo(genesFinalIndependent, genes.symbolinfo())
@@ -620,10 +773,7 @@ server <- function(input, output, session) {
                                                      %>% formatStyle(colnames(genesFinalIndependent)[1], color = "blue"))
         updateSelectInput(session, "summary.independentgroup", choices = groupchoices)
         shinyjs::show("summary.independentgroup")
-        #create plot
-        keywords_ora_independent<-calculateKeywordsORA(independent.infoORA())
-        independentoutput<<-reactive({PlotPathwayCluster(data.object(), doORA = TRUE, wordcloud = FALSE, uniquePathways = uniquepathwaysperform(), keywords_ora_inde=keywords_ora_independent)})
-        output$independentPlot<-renderPlot(independentoutput())
+
         if((data.object()@metadata[1,"organism"]=="org.Mm.eg.db")){
           #for mouse data hide tissue enrichment analysis
           hideTab(inputId = "tabsindependent", target = "Tissue")
@@ -633,14 +783,14 @@ server <- function(input, output, session) {
           tissueDataIndependent<-data.frame(rownames(data.object()@dfTissueIndependent), data.object()@dfTissueIndependent)
           colnames(tissueDataIndependent)[1]<-"Tissue"
           output$tissueOutputIndependent<-renderDataTable(datatable(tissueDataIndependent, rownames = FALSE, options = list(autoWidth=TRUE, scrollX=TRUE, scrollY=400, searching=TRUE, pageLength=10)))
-          tissueoutputindependent<<-reactive({PlotTissueExpression(data.object(), all = FALSE, uniquePathways=uniquepathwaysperform(), clusterIndependent=TRUE)})
+          tissueoutputindependent<<-reactive({PlotTissueExpression_shiny(data.object(), all = FALSE, uniquePathways=uniquepathwaysperform(), clusterIndependent=TRUE)})
           output$tissuePlotIndependent<-renderPlot(tissueoutputindependent())
         }else{
           hideTab(inputId = "tabs", target = "Tissue_S")
         }
-
+        
         update_modal_progress(value=0.5)
-
+        
         #download data and plots
         output$saveObject <- renderUI({
           downloadButton("save.object","Results")
@@ -653,30 +803,22 @@ server <- function(input, output, session) {
         output$downloadDataFormats <- renderUI({
           dropdownButton(inputId="download.plot.format",label="Images", circle=FALSE, radioButtons("format", label="", choices = c("jpg","png","pdf"), selected = NULL), downloadButton("download.plots","Download plots"))
         })
-
+        
         nclusters<-length(clusters)
         updateNumericInput(session, inputId="cluster", value=nclusters)
+        
 
-        if(checkGO(data.object())){
-          wordcloudperform(TRUE)
-          wordcloudinfo<<-reactive({PerformORAGOperCluster(data.object(), uniquePathways=uniquepathwaysperform(), clusterIndependent=FALSE)})
-          output$wordcloudCheckbox <- renderUI({checkboxInput("wordcloud", "Enable Wordcloud", value=FALSE)})
-        }else{
-          wordcloudperform(FALSE)
-          output$wordcloudCheckbox <- renderUI({tagList()})
-          #create plots
-          keywords_ora<-calculateKeywordsORA(ora.objectALL())
-          heatmapoutput<<-reactive({PlotGeneSets(Object = data.object(), doORA = T, wordcloud = wordcloudperform(), uniquePathways=uniquepathwaysperform(), keywords_ora=keywords_ora)})
-          output$heatmap<-renderPlot(heatmapoutput())
-        }
+        wordcloudperform(TRUE)
+        output$wordcloudCheckbox <- renderUI({checkboxInput("wordcloud", "Enable Wordcloud", value=FALSE)})
+        output$wordcloudCheckboxIndependent <- renderUI({checkboxInput("wordcloudIndependent", "Enable Wordcloud", value=FALSE)})
         update_modal_progress(value=0.7)
-
+        
         output$barplot<-renderPlot(createBarPlot(data.object(), clusterchoices[1], uniquePathways=uniquepathwaysperform()))
         update_modal_progress(value=0.9)
-
+        
         updateSelectInput(session, "breakup.cluster", choices = clusterchoices)
         updateSelectInput(session, "summary.cluster", choices = clusterchoices)
-
+        
         showTab(inputId = "tabs3", target="tabpanelresult", select=TRUE)
         #updateTabsetPanel(session, "tabs3", selected = "tabpanelresult", args = list(tabpanelresult = "Results"))
         runjs('
@@ -686,11 +828,10 @@ server <- function(input, output, session) {
         shinyjs::toggle("main1")
         shinyjs::toggle("main2")
         remove_modal_progress()
-
+        
       }else{
         show_modal_progress_line(text="")
         update_modal_progress(value=0.2, text="Load gene sets (1/5)") # update progress bar value
-        #showModal(modalDialog("Load gene sets (1/5)", footer=NULL))
         #1-if input=great load gene set with specifc parameters and perform manage.object
         if ((input$source=="Great") || (input$source=="GSEA") || (input$source=="GSEA2")){
           if(input$source=="GSEA2"){
@@ -718,7 +859,7 @@ server <- function(input, output, session) {
                                               Organism = input$organism,
                                               seperator = ",") #,
           }
-
+          
           if(is.character(load.object)){
             remove_modal_progress()
             #one of the group has 0 pathways
@@ -726,27 +867,27 @@ server <- function(input, output, session) {
             tocontinue=FALSE
           }else{
             #showModal(modalDialog("Manage gene sets (2/5).", footer=NULL))
-            update_modal_progress(value=0.4, text="Manage gene sets (2/5)")
-            manage.object <- ManageGeneSets(Object = load.object,
+            update_modal_progress(value=0.3, text="Manage gene sets (2/5)")
+            manage.object <- ManageGeneSets_shiny(Object = load.object,
                                             keep.type =c("Disease Ontology",
                                                          "GO Biological Process" ),
                                             exclude.type="")
           }
-
+        
         }
         #1-if input=ipa load gene set with specifc parameters and don't perform manage.object
         else if ((input$source=="IPA")){
-
-          load.object <- LoadGeneSets_shiny(file_location = input$files[,4],
-                                            groupnames= tablegroup$data[,2],
-                                            P.cutoff = 1.3,
-                                            Mol.cutoff = 5,
-                                            Source = input$source,
-                                            type = "Canonical_Pathways",
-                                            structure = input$gene.id,
-                                            Organism = input$organism,
-                                            seperator = ",")
-
+          
+          load.object <- LoadGeneSets_shiny(file_location = files()$datapath,
+                                                groupnames= files_data_group$group,
+                                                P.cutoff = 1.3,
+                                                Mol.cutoff = 5,
+                                                Source = input$source,
+                                                type = "Canonical_Pathways",
+                                                structure = input$gene.id,
+                                                Organism = input$organism,
+                                                seperator = ",")
+          
           if(is.character(load.object)){
             remove_modal_progress()
             #one of the group has 0 pathways
@@ -755,12 +896,17 @@ server <- function(input, output, session) {
           }else{
             manage.object<-load.object
           }
-          #annotationperform=FALSE
-
+          
         }
         if(tocontinue){
-
+    
           rm(load.object)
+          
+          if((input$filters=="uniquepathways")){
+            uniquepathwaysperform(TRUE)
+          }else{
+            uniquepathwaysperform(FALSE)
+          }
 
           #check seperator
           possibleSeparators<-c(",","/",";")
@@ -772,30 +918,28 @@ server <- function(input, output, session) {
           if (length(unique(manage.object@metadata$seperator))!=1){
             remove_modal_progress()
             shinyalert("Error", "Please, use the same gene-seperator (, ; /) in all data ", type = "error")
-
+            
           }else{
-
-            update_modal_progress(value=0.6, text="Combine gene sets (3/5)")
+            
+            update_modal_progress(value=0.4, text="Combine gene sets (3/5)")
             #2-perform combine gene set
-            combine.object <- CombineGeneSets(Object = manage.object, threads = 16)
+            combine.object <- CombineGeneSets_shiny(Object = manage.object, threads = 16)
             rm(manage.object)
-
+            
             #2.1-calculate optimal number of cluster
             optimal.object<-OptimalGeneSets_2(object = combine.object, method = "silhouette", max_cluster= 10, cluster_method = "kmeans", main= "", uniquePathways=uniquepathwaysperform())
             nclust<-optimal.object$data
-
+  
             optimalCluster<-as.numeric(nclust$clusters[which.max(nclust$y)])
             updateNumericInput(session, inputId="cluster", value=optimalCluster)
-
-            update_modal_progress(value=0.8, text=paste("Cluster gene sets, optimal k=",optimalCluster," (4/5)", sep=""))
+            
+            update_modal_progress(value=0.6, text=paste("Cluster gene sets, optimal k=",optimalCluster," (4/5)", sep=""))
             #3-perform cluster gene set
-            cluster.object <- ClusterGeneSets(Object = combine.object,
+            cluster.object <- ClusterGeneSets_shiny(Object = combine.object,
                                               clusters = optimalCluster,
                                               method = "kmeans", order="cluster")
             rm(combine.object)
-
-
-
+            
             if(uniquepathwaysperform()){
               cluster.object <- transferinfo(cluster.object)
               clusterchoices<-paste("Cluster_", names(cluster.object@plot$aka3Unique$Cluster), sep="")
@@ -809,8 +953,6 @@ server <- function(input, output, session) {
             clusterchoices<-clusterchoices[order(clusterchoices)]
             data.object<<-reactive({cluster.object})
 
-
-
             #download data and plots
             output$saveObject <- renderUI({
               downloadButton("save.object","Results")
@@ -823,15 +965,15 @@ server <- function(input, output, session) {
             output$downloadDataFormats <- renderUI({
               dropdownButton(inputId="download.plot.format",label="Images", circle=FALSE, radioButtons("format", label="", choices = c("jpg","png","pdf"), selected = NULL), downloadButton("download.plots","Download plots"))
             })
-
+            
             #put check box depending the number of cluster
-
+            
             output$checkboxCluster <- renderUI({
               clusterchoices_all<-c("Uncheck all", clusterchoices)
               checkboxGroupInput("optionCluster", label = "", choices=clusterchoices_all, selected = clusterchoices, inline=TRUE)
             })
             output$barplot<-renderPlot(createBarPlot(cluster.object, clusterchoices[1], uniquePathways=uniquepathwaysperform()))
-
+            
             if(!is.character(cluster.object@Data[[1]]$Ratio[1])){
               cluster.object@Data[[1]]$Ratio<-round(cluster.object@Data[[1]]$Ratio,3)
             }
@@ -847,51 +989,48 @@ server <- function(input, output, session) {
               colnames(resultAnnotationsFinal)[c(3,4)]<-c("Group", "Cluster")
               annotations<<-reactive({resultAnnotationsFinal})
             }
-
+            
             #4-ORA per cluster using enrichGO of clusterprofiler
-            update_modal_progress(value=0.9, text="ORA per cluster (5/5)")
-
+            update_modal_progress(value=0.8, text="ORA per cluster (5/5)")
+            
             genesFinal<-calculategenestable(cluster.object, uniquepathwaysperform())
             if(unique(as.character(cluster.object@metadata[,"structure"]))!="SYMBOL"){
               symbolinfo<-calculateSymbol(cluster.object, genesFinal)
               genes.symbolinfo<<-reactive({symbolinfo})
               genesFinal<-combineSymbolInfo(genesFinal, genes.symbolinfo())
             }
-
+            
             #calulate ORA in parallel
             oraResults<-do.call("rbind", lapply(clusters, calculateORA, object=cluster.object, uniquePathways=uniquepathwaysperform()))
             ora.objectALL<<-reactive({oraResults})
             oraResultsTop<-do.call("rbind", lapply(clusters, topORA, ora=oraResults, top=as.integer(input$top)))
             ora.object<<-reactive({oraResultsTop})
-
+            
             output$oraInfo<-renderDataTable(datatable(as.data.frame(oraResultsTop), rownames = FALSE, options = list(searching=TRUE, pageLength=10, rowCallback = JS(underlineCellsCols(c(1),c(0)))))
                                             %>% formatStyle(colnames(oraResultsTop)[1], color = "blue"))
-
-
+            
             genesfinal.info<<-reactive({genesFinal})
             output$genesInfo <-renderDataTable(datatable(genesFinal, rownames = FALSE, filter="top", options = list(dom='lrtip', pageLength=10, rowCallback = JS(underlineCellsCols(c(1),c(0)))))
                                                %>% formatStyle(colnames(genesFinal)[1], color = "blue"))
-
-
-
+            
+            update_modal_progress(value=0.9, text="ORA per cluster (5/5)")
             if(checkGO(cluster.object)){
               wordcloudperform(TRUE)
-              wordcloudinfo<<-reactive({PerformORAGOperCluster(cluster.object, uniquePathways=uniquepathwaysperform(), clusterIndependent=FALSE)})
+              wordcloudannotation<-PerformORAGOperCluster_shiny(cluster.object, uniquePathways=uniquepathwaysperform(), clusterIndependent=FALSE)
+              wordcloudinfo<<-reactive({wordcloudannotation})
               output$wordcloudCheckbox <- renderUI({checkboxInput("wordcloud", "Enable Wordcloud", value=FALSE)})
             }else{
               wordcloudperform(FALSE)
               output$wordcloudCheckbox <- renderUI({tagList()})
               #plot heatmap
               keywords_ora<-calculateKeywordsORA(ora.objectALL())
-              heatmapoutput<<-reactive({PlotGeneSets(cluster.object, doORA = T, wordcloud = wordcloudperform(), uniquePathways=uniquepathwaysperform(), keywords_ora=keywords_ora)})
+              heatmapoutput<<-reactive({PlotGeneSets_shiny(cluster.object, doORA = T, wordcloud = wordcloudperform(), uniquePathways=uniquepathwaysperform(), keywords_ora=keywords_ora)})
               output$heatmap<-renderPlot(heatmapoutput())
             }
-
-
+            
             updateSelectInput(session, "breakup.cluster", choices = clusterchoices)
             updateSelectInput(session, "summary.cluster", choices = clusterchoices)
-
-
+            
             #hide tissue and independent results
             hideTab(inputId = "tabs", target = "Tissue")
             hideTab(inputId = "tabs", target = "Heatmap_S")
@@ -903,9 +1042,8 @@ server <- function(input, output, session) {
               #for mouse data hide tissue enrichment analysis
               hideTab(inputId = "tabs2", target = "Tissue enrichment")
             }
-
+            
             showTab(inputId = "tabs3", target="tabpanelresult", select=TRUE)
-            #updateTabsetPanel(session, "tabs3", selected = "tabpanelresult", args = list(tabpanelresult = "Results"))
             runjs('
             // Change the tab label when the button is clicked
             $("#tabs3 a[data-value=\'tabpanelresult\']").text("Results");
@@ -919,9 +1057,9 @@ server <- function(input, output, session) {
 
     }
 
-
+    
   }) #end of printResults
-
+  
   ###########################
   ###########################
   #WORD CLOUD CHECK
@@ -933,10 +1071,21 @@ server <- function(input, output, session) {
       wordcloudperform(TRUE)
     }
     keywords_ora<-calculateKeywordsORA(ora.objectALL())
-    heatmapoutput<<-reactive({PlotGeneSets(Object = data.object(), doORA = T, wordcloud = wordcloudperform(), wordclouds=wordcloudinfo(), uniquePathways=uniquepathwaysperform(), keywords_ora=keywords_ora)})
+    heatmapoutput<<-reactive({PlotGeneSets_shiny(Object = data.object(), doORA = T, wordcloud = wordcloudperform(), wordclouds=wordcloudinfo(), uniquePathways=uniquepathwaysperform(), keywords_ora=keywords_ora)})
     output$heatmap<-renderPlot(heatmapoutput())
   })
-
+  
+  observeEvent(input$wordcloudIndependent, {
+    # Check if the checkbox is unchecked
+    keywords_ora_independent<-calculateKeywordsORA(independent.infoORA())
+    if (!input$wordcloudIndependent) {
+      independentoutput<<-reactive({PlotPathwayCluster_shiny(data.object(), doORA = TRUE, wordcloud = FALSE, uniquePathways = uniquepathwaysperform(), keywords_ora_inde=keywords_ora_independent)})
+    }else{
+      independentoutput<<-reactive({PlotPathwayCluster_shiny(data.object(), doORA = TRUE, wordcloud = TRUE, wordclouds = wordcloudinfoIndependent(), uniquePathways = uniquepathwaysperform(), keywords_ora_inde=keywords_ora_independent)})
+    }
+    output$independentPlot<-renderPlot(independentoutput())
+  })
+  
   ###########################
   ###########################
   #UPLOAD FILTERS
@@ -961,7 +1110,7 @@ server <- function(input, output, session) {
       shinyjs::hide("uploadResult")
     }
   })
-
+  
   ###########################
   ###########################
   #DATABASE OPTIONS
@@ -969,26 +1118,29 @@ server <- function(input, output, session) {
     if(!is.null(data.object())){
       if (data.object()@metadata[1,"organism"]=="org.Hs.eg.db") {
         updateSelectizeInput(session = session, inputId = "database", choices=c("","Human Phenotype Ontology (HPO)","Customize"), server=TRUE)
-        selectizeInput("database", "Human databases:", choices=NULL, selected = NULL, multiple=FALSE)
+        selectizeInput("database", "Human databases:", choices=NULL, selected = NULL, multiple=FALSE)  
       }else if (data.object()@metadata[1,"organism"]=="org.Mm.eg.db") {
         updateSelectizeInput(session = session, inputId = "database", choices=c("","Mammalian Phenotype (MP)", "Customize"), server=TRUE)
-        selectizeInput("database", "Mouse databases:", choices=NULL, selected = NULL, multiple=FALSE)
+        selectizeInput("database", "Mouse databases:", choices=NULL, selected = NULL, multiple=FALSE)  
       }
     }
   })
   output$databaseOptions <- renderUI({
-    if(!is.null(input$database)){
+    if(!is.null(input$database)){ 
       if (input$database=="Human Phenotype Ontology (HPO)") {
         updateSelectizeInput(session = session, inputId = "hpo", choices=c("",unique(hpoDatabase$hpo_id)), server=TRUE)
-        selectizeInput("hpo", HTML("Choose HPO <a href='https://hpo.jax.org/app/browse/term/HP:0000118' target='_blank'>(info)</a>:"), choices=NULL, selected = NULL, multiple=FALSE)
+        selectizeInput("hpo", HTML("Choose HPO <a href='https://hpo.jax.org/app/browse/term/HP:0000118' target='_blank'>(info)</a>:"), choices=NULL, selected = NULL, multiple=FALSE)  
       }else if (input$database=="Mammalian Phenotype (MP)") {
         updateSelectizeInput(session = session, inputId = "mp", choices=c("",unique(mpDatabase$mp_id)), server=TRUE)
-        selectizeInput("mp", HTML("Choose MP <a href='https://www.informatics.jax.org/vocab/mp_ontology' target='_blank'>(info)</a>:"), choices=NULL, selected = NULL, multiple=FALSE)
+        selectizeInput("mp", HTML("Choose MP <a href='https://www.informatics.jax.org/vocab/mp_ontology' target='_blank'>(info)</a>:"), choices=NULL, selected = NULL, multiple=FALSE)  
       }else if (input$database=="Customize") {
         fileInput("fileCustomize", "One column with gene symbols", accept = c("text/csv","text/comma-separated-values,text/plain",".csv", ".txt", ".xls", ".xlsx"))
       }
     }
   })
+  ###########################
+  ###########################
+  #HIGHLIGHT GENESETS
   genescustomhighlight<-reactive({})
   observeEvent(input$fileCustomize,{
     #determine file extension
@@ -1003,7 +1155,7 @@ server <- function(input, output, session) {
     output$databaseOptionTitle<-renderText({paste("Number of genes = ", dim(dfcustomize)[1])})
     output$databaseGenes<-renderText({dfcustomize$genes})
   })
-
+  
   observe({
     if((input$hpo!="")&&(!is.null(input$hpo))){
       output$databaseOptionTitle<-renderText({hpoDatabase$hpo_id[hpoDatabase$hpo_id==input$hpo][1]})
@@ -1039,12 +1191,12 @@ server <- function(input, output, session) {
       output$databaseGenes<-renderText({NULL})
     }
   })
-
+  
   observeEvent(input$calculateHighlight, {
     if((input$database=="")|((input$database=="Mammalian Phenotype (MP)")&&(input$mp==""))|((input$database=="Human Phenotype Ontology (HPO)")&&(input$hpo==""))){
       shinyalert(title = "Wrong database", text = "Please, select a database and a gene set.", type = "error")
     }else{
-
+      
       show_modal_progress_line(value=0.2, text="Calculate highlight genes")
       update_modal_progress(value=0.3)
       if((input$hpo!="")&&(!is.null(input$hpo))){
@@ -1071,7 +1223,7 @@ server <- function(input, output, session) {
       remove_modal_progress()
     }
   })
-
+  
   ###########################
   ###########################
   #FILTER TOP ORA
@@ -1083,20 +1235,18 @@ server <- function(input, output, session) {
       }else{
         clusters<-unique(data.object()@plot$aka2$Cluster)
       }
-
+      
       oraResultsTop<-do.call("rbind", lapply(clusters, topORA, ora=ora.objectALL(), top=as.integer(input$top)))
       ora.object<<-reactive({oraResultsTop})
       oraFiltered<-as.data.frame(ora.object())
       oraFiltered<-oraFiltered[oraFiltered$Cluster %in% input$optionCluster,]
-      #output$oraInfo<-renderDataTable(datatable(oraFiltered, rownames = FALSE, options = list(searching=TRUE, pageLength=10, rowCallback = JS(underlineCellsCols(c(1),c(0))), columnDefs = list(list(targets = c(7), visible = FALSE))))
-      #                                %>% formatStyle(colnames(oraFiltered)[1], color = "blue"))
       output$oraInfo<-renderDataTable(datatable(oraFiltered, rownames = FALSE, options = list(searching=TRUE, pageLength=10, rowCallback = JS(underlineCellsCols(c(1),c(0)))))
                                       %>% formatStyle(colnames(oraFiltered)[1], color = "blue"))
-
+      
     }
-
+    
   })
-
+  
   ###########################
   ###########################
   #FILTER BY CLUSTER -> ORA and table of GO
@@ -1106,7 +1256,7 @@ server <- function(input, output, session) {
       if ("Uncheck all" %in% input$optionCluster) {
         updateCheckboxGroupInput(session, "optionCluster", selected = character(0))
       }
-
+      
       #if any option is selected print NULL
       tableFiltered<-annotations()
       tableFiltered<-tableFiltered[tableFiltered$Cluster %in% c("Cluster_X"),]
@@ -1125,13 +1275,13 @@ server <- function(input, output, session) {
 
     }
   })
-
+  
   observeEvent(input$optionCluster,{
-
+    
     if ("Uncheck all" %in% input$optionCluster) {
       updateCheckboxGroupInput(session, "optionCluster", selected = character(0))
     }
-
+    
     tableFiltered<-annotations()
     tableFiltered<-tableFiltered[tableFiltered$Cluster %in% input$optionCluster,]
 
@@ -1148,7 +1298,7 @@ server <- function(input, output, session) {
     }else{
       output$dataInfo <-renderDataTable(datatable(tableFiltered, rownames = FALSE, options = list(autoWidth=TRUE, scrollX=TRUE, scrollY=400, searching=TRUE, pageLength=25)))
     }
-
+    
     oraFiltered<-as.data.frame(ora.object())
     oraFiltered<-oraFiltered[oraFiltered$Cluster %in% input$optionCluster,]
     if(uniquepathwaysperform()){
@@ -1160,19 +1310,18 @@ server <- function(input, output, session) {
                                       %>% formatStyle(colnames(oraFiltered)[9], backgroundColor = styleEqual(c(paste("Cluster_", names(data.object()@plot$aka3$Cluster), sep="")), c(data.object()@plot$aka3$Cluster)))
                                       %>% formatStyle(colnames(oraFiltered)[1], color = "blue"))
     }
-
+    
   })
-
-
+  
   ###########################
   ###########################
-  #RECALCULATING CLUSTERING
+  #RECALCULATE CLUSTERING
   observeEvent(input$recalculateClustering, {
     show_modal_progress_line(value=0.3, text="Reclustering (1/2)")
     update_modal_progress(value=0.4, text="Reclustering (1/2)") # update progress bar value
-    new.object<-ClusterGeneSets(Object = data.object(),
-                                clusters = input$cluster,
-                                method = "kmeans", order="cluster")
+    new.object<-ClusterGeneSets_shiny(Object = data.object(),
+                    clusters = input$cluster,
+                    method = "kmeans", order="cluster")
     if(uniquepathwaysperform()){
       new.object <- transferinfo(new.object)
       clusterchoices<-paste("Cluster_", names(new.object@plot$aka3Unique$Cluster), sep="")
@@ -1187,16 +1336,15 @@ server <- function(input, output, session) {
     clusterchoices<-clusterchoices[order(clusterchoices)]
     data.object<<-reactive({new.object})
 
-    update_modal_progress(value=0.5, text="Reclustering (1/2)")
-
-
+    update_modal_progress(value=0.5, text="Reclustering (1/2)") 
+    
     #show new data results
     annotationsUpdate<-annotations()
     annotationsUpdate$Cluster<-data.object()@Data[[1]]$cluster
     annotations<<-reactive({annotationsUpdate})
-
+    
     update_modal_progress(value=0.8, text="ORA per cluster (2/2)") # update progress bar value
-
+    
     genesFinal<-calculategenestable(data.object(), uniquepathwaysperform())
     if(unique(as.character(data.object()@metadata[,"structure"]))!="SYMBOL"){
       genesFinal<-combineSymbolInfo(genesFinal, genes.symbolinfo())
@@ -1204,47 +1352,48 @@ server <- function(input, output, session) {
     #recalculate ORA per cluster
     oraResults<-do.call("rbind", lapply(clusters, calculateORA, object=data.object(), uniquePathways=uniquepathwaysperform()))
     ora.objectALL<<-reactive({oraResults})
-
+    
     oraResultsTop<-do.call("rbind", lapply(clusters, topORA, ora=oraResults, top=as.integer(input$top)))
     ora.object<<-reactive({oraResultsTop})
-
+    
     genesfinal.info<<-reactive({genesFinal})
     output$genesInfo <-renderDataTable(datatable(genesFinal, rownames = FALSE, filter="top", options = list(pageLength=10, rowCallback = JS(underlineCellsCols(c(1),c(0)))))
-                                       %>% formatStyle(colnames(genesFinal)[1], color = "blue"))
-
-
+                                        %>% formatStyle(colnames(genesFinal)[1], color = "blue"))
+    
+    
     #plot new heatmap
     keywords_ora<-calculateKeywordsORA(ora.objectALL())
-    if(wordcloudperform()){
-      wordcloudinfo<<-reactive({PerformORAGOperCluster(cluster.object, uniquePathways=uniquepathwaysperform(), clusterIndependent=FALSE)})
+    if(checkGO(data.object())){
+      wordcloudannotation<-PerformORAGOperCluster_shiny(data.object(), uniquePathways=uniquepathwaysperform(), clusterIndependent=FALSE)
+      wordcloudinfo<<-reactive({wordcloudannotation})
     }
-    heatmapoutput<<-reactive({PlotGeneSets(Object = data.object(), doORA = T, wordcloud = wordcloudperform(), wordclouds=wordcloudinfo(), uniquePathways=uniquepathwaysperform(), keywords_ora=keywords_ora)})
+    heatmapoutput<<-reactive({PlotGeneSets_shiny(Object = data.object(), doORA = T, wordcloud = wordcloudperform(), wordclouds=wordcloudinfo(), uniquePathways=uniquepathwaysperform(), keywords_ora=keywords_ora)})
     output$heatmap<-renderPlot(heatmapoutput())
-
+    
     update_modal_progress(value=0.9, text="ORA per cluster (2/2)") # update progress bar value
-
+    
     #put check box of cluster
     output$checkboxCluster <- renderUI({
       clusterchoices_all<-c("Uncheck all", clusterchoices)
       checkboxGroupInput("optionCluster", label = "", choices=clusterchoices_all, selected = clusterchoices, inline=TRUE)
     })
     output$barplot<-renderPlot(createBarPlot(data.object(), clusterchoices[1], uniquePathways=uniquepathwaysperform()))
-
+    
     updateSelectInput(session, "breakup.cluster", choices = clusterchoices)
     updateSelectInput(session, "summary.cluster", choices = clusterchoices)
-
+    
     #reset tissue results
     shinyjs::show("calculateTissueEnrichment")
     hideTab(inputId = "tabs", target = "Tissue")
     output$tissueOutput<-renderDataTable(NULL)
     output$tissueIntro<-renderUI({tags$p("Choose specific tissues for performing enrichment analysis (the tissues were selected from", HTML("<a href='https://gtexportal.org/home/' target='_blank'>here</a>"), "):")})
     remove_modal_progress()
-
+    
   })
+  
   ###########################
   ###########################
   #PERFORM ORA PER GENES
-  #shinyjs::hide("downloadORAgenes")
   oragenesfiltered<-reactive({})
   observeEvent(input$performORAgenes, {
     numbergenes<-dim(genesfinal.info()[input$genesInfo_rows_all,])[1]
@@ -1267,7 +1416,7 @@ server <- function(input, output, session) {
       write.csv(oragenesfiltered(), file, row.names=FALSE)
     }
   )
-
+  
   ###########################
   ###########################
   #CALCULATE TISSUE ENRICHMENT CLUSTERING
@@ -1280,134 +1429,139 @@ server <- function(input, output, session) {
       load("databases/TissueLocalDatabase15.RData")
       load("databases/dic.rda")
       #shinyjs::hide("calculateTissueEnrichment")
-
+      
       localDatabase15<-localDatabase15[input$tissuesselected]
-      tissue.object <-TissueExpressionPerGeneSet(data.object(), localDatabase = localDatabase15, dic=dic, uniquePathways=uniquepathwaysperform(), clusterIndependent=FALSE)
+      tissue.object <-TissueExpressionPerGeneSet_shiny(data.object(), localDatabase = localDatabase15, dic=dic, uniquePathways=uniquepathwaysperform(), clusterIndependent=FALSE)
       tissue.object@dfTissue<-round(tissue.object@dfTissue,3)
       tissue.object@dfTissue<-na_replace(tissue.object@dfTissue,0)
       data.object<<-reactive({tissue.object})
-
+      
       update_modal_progress(value=0.7, text="Calculate tissue enrichment")
       tissueData<-data.frame(rownames(tissue.object@dfTissue), tissue.object@dfTissue)
       colnames(tissueData)[1]<-"Tissue"
       output$tissueOutput<-renderDataTable(datatable(tissueData, rownames = FALSE, options = list(searching=TRUE, pageLength=10)))
-      #shinyjs::hide("calculateTissueEnrichment")
-
+  
       output$tissueIntro<-renderUI({tags$p("Tissue enrichment results per cluster (Cluster_number..number of genes):")})
       showTab(inputId = "tabs", target = "Tissue", select=TRUE)
-
+      
       update_modal_progress(value=0.9)
       #plot tissue plots
-      tissueoutput<<-reactive({PlotTissueExpression(tissue.object, all = FALSE, uniquePathways=uniquepathwaysperform(), clusterIndependent=FALSE)})
+      tissueoutput<<-reactive({PlotTissueExpression_shiny(tissue.object, all = FALSE, uniquePathways=uniquepathwaysperform(), clusterIndependent=FALSE)})
       output$tissuePlot<-renderPlot(tissueoutput())
-
-
 
       rm(localDatabase15)
       rm(dic)
       remove_modal_progress()
     }
-
+    
   })
-
+  
   ###########################
-  #RUN INDEPENDENT ANALYSIS
+  ###########################
+  #RUN SERIATION-BASED ANALYSIS
   observeEvent(input$runIndependent, {
-    shinyjs::hide("runIndependent")
-    show_modal_progress_line(value=0.3, text="Run seriation-based analysis")
-    update_modal_progress(value=0.5, text="Run seriation-based analysis")
-
-    output$independentIntro<-renderUI({tags$p("")})
-    independent.object<-ClusterIndependentGeneSet(data.object(), uniquePathways = uniquepathwaysperform(),  nPathways = "optimal")
-    data.object<<-reactive({independent.object})
-
-    update_modal_progress(value=0.6, text="Run seriation-based analysis")
-    if(checkGO(data.object())){
-      wordcloudindependent<-TRUE
-    }else{
-      wordcloudindependent<-FALSE
-    }
-    #pathway information per grouping
-    resultindependent<-ShowPathwayCluster(independent.object,  uniquePathways = uniquepathwaysperform())
-    annotated_resultindependent <- lapply(seq_along(resultindependent), function(i,uniquePathways = uniquepathwaysperform(), goids=wordcloudindependent) {
-      go_list <- resultindependent[[i]]
-      if(uniquePathways){
-        if(goids){
-          subset_df <- annotations()[annotations()$ID %in% go_list, c("ID","Term","Group")]
-          annotated_terms <- merge(subset_df, data.frame(ID = go_list, Cluster = paste("Cluster_",i, sep="")), by = "ID", all.y = TRUE)
-        }else{
-          subset_df <- annotations()[annotations()$Pathways %in% go_list, c("Pathways","Group")]
-          annotated_terms <- merge(subset_df, data.frame(Pathways = go_list, Cluster = paste("Cluster_",i, sep="")), by = "Pathways", all.y = TRUE)
-        }
+      shinyjs::hide("runIndependent")
+      show_modal_progress_line(value=0.3, text="Run seriation-based analysis")
+      update_modal_progress(value=0.5, text="Run seriation-based analysis")
+    
+      output$independentIntro<-renderUI({tags$p("")})
+      independent.object<-ClusterIndependentGeneSet_shiny(data.object(), uniquePathways = uniquepathwaysperform(),  nPathways = "optimal")
+      data.object<<-reactive({independent.object})
+      
+      update_modal_progress(value=0.6, text="Run seriation-based analysis")
+      if(checkGO(data.object())){
+        wordcloudindependent<-TRUE
       }else{
-        if(goids){
-          subset_df <- annotations()[paste(annotations()$Group, annotations()$ID, sep="_") %in% go_list, c("ID","Term","Group")]
-          subset_df<-cbind(paste(subset_df$Group, subset_df$ID, sep="_"), subset_df)
-          colnames(subset_df)[1]<-"rowname"
-          annotated_terms <- merge(subset_df, data.frame(ID = go_list, Cluster = paste("Cluster_",i, sep="")), by.x="rowname", by.y = "ID", all.y = TRUE)
-          annotated_terms<-annotated_terms[,-1]
-        }else{
-          subset_df <- annotations()[paste(annotations()$Group, annotations()$Pathways, sep="_") %in% go_list, c("ID","Term","Group")]
-          subset_df<-cbind(paste(subset_df$Group, subset_df$ID, sep="_"), subset_df)
-          colnames(subset_df)[1]<-"rowname"
-          annotated_terms <- merge(subset_df, data.frame(Pathways = go_list, Cluster = paste("Cluster_",i, sep="")), by.x="rowname", by.y = "Pathways", all.y = TRUE)
-          annotated_terms<-annotated_terms[,-1]
-        }
+        wordcloudindependent<-FALSE
       }
-
-      return(annotated_terms)
-    })
-    combined_resultindependent<-do.call(rbind, annotated_resultindependent)
-    groupchoices<-unique(combined_resultindependent$Cluster)
-    independent.info<<-reactive({combined_resultindependent})
-    updateSelectInput(session, "summary.independentgroup", choices = groupchoices)
-    shinyjs::show("summary.independentgroup")
-
-    if(checkGO(data.object())){
-      output$independentOutput <-renderDataTable(datatable(combined_resultindependent, rownames = FALSE, options = list(autoWidth=TRUE, scrollX=TRUE, scrollY=400, searching=TRUE, pageLength=25, rowCallback = JS(underlineCellsCols(c(1),c(0)))))
-                                                 %>% formatStyle(colnames(combined_resultindependent)[4], backgroundColor = styleEqual(c(paste("Cluster_", names(data.object()@plot[[6]]$Cluster)[names(data.object()@plot[[6]]$Cluster)!=0], sep="")), c(data.object()@plot[[6]]$Cluster[data.object()@plot[[6]]$Cluster!="white"])))
-                                                 %>% formatStyle(colnames(combined_resultindependent)[1], color = "blue"))
-    }else{
-      output$independentOutput <-renderDataTable(datatable(combined_resultindependent, rownames = FALSE, options = list(autoWidth=TRUE, scrollX=TRUE, scrollY=400, searching=TRUE, pageLength=25))
-                                                 %>% formatStyle(colnames(combined_resultindependent)[4], backgroundColor = styleEqual(c(paste("Cluster_", names(data.object()@plot[[6]]$Cluster)[names(data.object()@plot[[6]]$Cluster)!=0], sep="")), c(data.object()@plot[[6]]$Cluster[data.object()@plot[[6]]$Cluster!="white"]))))
-    }
-
-    genesFinalIndependent<-calculategenestableinde(data.object(),combined_resultindependent)
-    if(unique(as.character(data.object()@metadata[,"structure"]))!="SYMBOL"){
-      genesFinalIndependent<-combineSymbolInfo(genesFinalIndependent, genes.symbolinfo())
-    }
-    output$genesInfoIndependent<-renderDataTable(datatable(genesFinalIndependent, rownames = FALSE, filter="top", options = list(autoWidth=TRUE, scrollX=TRUE, scrollY=400, searching=TRUE, dom='lrtip', pageLength=10, rowCallback = JS(underlineCellsCols(c(1),c(0)))))
-                                                 %>% formatStyle(colnames(genesFinalIndependent)[1], color = "blue"))
-
-    #output$independentOutput<-renderDataTable(datatable(combined_resultindependent, rownames = FALSE, options = list(searching=TRUE, pageLength=10)))
-    output$barplotIndependent<-renderPlot(createBarPlotIndependent(data.object(), combined_resultindependent, groupchoices[1], uniquePathways=uniquepathwaysperform()))
-
-    #Calculate ORA in independent results
-    oraResultsIndependent<-do.call("rbind", lapply(groupchoices, calculateORAindependent, object=data.object(), independent_info=combined_resultindependent, uniquePathways=uniquepathwaysperform()))
-    independent.infoORA<<-reactive({oraResultsIndependent})
-    output$independentORAOutput<-renderDataTable(datatable(oraResultsIndependent, rownames = FALSE, options = list(autoWidth=TRUE, scrollX=TRUE, scrollY=400, searching=TRUE, pageLength=10, rowCallback = JS(underlineCellsCols(c(1),c(0)))))
-                                                 %>% formatStyle(colnames(oraResultsIndependent)[9], backgroundColor = styleEqual(c(paste("Cluster_", names(data.object()@plot[[6]]$Cluster)[names(data.object()@plot[[6]]$Cluster)!=0], sep="")), c(data.object()@plot[[6]]$Cluster[data.object()@plot[[6]]$Cluster!="white"])))
-                                                 %>% formatStyle(colnames(oraResultsIndependent)[1], color = "blue"))
-
-    update_modal_progress(value=0.8, text="Run seriation-based analysis")
-    #create plot
-    keywords_ora_independent<-calculateKeywordsORA(independent.infoORA())
-    independentoutput<<-reactive({PlotPathwayCluster(independent.object, doORA = TRUE, wordcloud = FALSE, uniquePathways = uniquepathwaysperform(), keywords_ora_inde=keywords_ora_independent)})
-    output$independentPlot<-renderPlot(independentoutput())
-    update_modal_progress(value=0.9, text="Run seriation-based analysis")
-    remove_modal_progress()
-    showTab(inputId = "tabs", target = "Heatmap_S", select=TRUE)
-    if((data.object()@metadata[1,"organism"]!="org.Mm.eg.db")){
-      #for mouse data hide tissue enrichment analysis
-      showTab(inputId = "tabsindependent", target = "Tissue")
-    }
-    showTab(inputId = "tabsindependent", target = "ORA")
-    showTab(inputId = "tabsindependent", target = "Genes")
+      #pathway information per grouping
+      resultindependent<-ShowPathwayCluster_shiny(independent.object,  uniquePathways = uniquepathwaysperform())
+      annotated_resultindependent <- lapply(seq_along(resultindependent), function(i,uniquePathways = uniquepathwaysperform(), goids=wordcloudindependent) {
+        go_list <- resultindependent[[i]]
+        if(uniquePathways){
+          if(goids){
+            subset_df <- annotations()[annotations()$ID %in% go_list, c("ID","Term","Group")]
+            annotated_terms <- merge(subset_df, data.frame(ID = go_list, Cluster = paste("Cluster_",i, sep="")), by = "ID", all.y = TRUE)
+          }else{
+            subset_df <- annotations()[annotations()$Pathways %in% go_list, c("Pathways","Group")]
+            annotated_terms <- merge(subset_df, data.frame(Pathways = go_list, Cluster = paste("Cluster_",i, sep="")), by = "Pathways", all.y = TRUE)
+          }
+        }else{
+          if(goids){
+            subset_df <- annotations()[paste(annotations()$Group, annotations()$ID, sep="_") %in% go_list, c("ID","Term","Group")]
+            subset_df<-cbind(paste(subset_df$Group, subset_df$ID, sep="_"), subset_df)
+            colnames(subset_df)[1]<-"rowname"
+            annotated_terms <- merge(subset_df, data.frame(ID = go_list, Cluster = paste("Cluster_",i, sep="")), by.x="rowname", by.y = "ID", all.y = TRUE)
+            annotated_terms<-annotated_terms[,-1]
+          }else{
+            subset_df <- annotations()[paste(annotations()$Group, annotations()$Pathways, sep="_") %in% go_list, c("Pathways","Group")]
+            subset_df<-cbind(paste(subset_df$Group, subset_df$Pathways, sep="_"), subset_df)
+            colnames(subset_df)[1]<-"rowname"
+            annotated_terms <- merge(subset_df, data.frame(Pathways = go_list, Cluster = paste("Cluster_",i, sep="")), by.x="rowname", by.y = "Pathways", all.y = TRUE)
+            annotated_terms<-annotated_terms[,-1]
+          }
+        }
+        
+        return(annotated_terms)
+      })
+      combined_resultindependent<-do.call(rbind, annotated_resultindependent)
+      groupchoices<-unique(combined_resultindependent$Cluster)
+      independent.info<<-reactive({combined_resultindependent})
+      updateSelectInput(session, "summary.independentgroup", choices = groupchoices)
+      shinyjs::show("summary.independentgroup")
+      if(checkGO(data.object())){
+        output$independentOutput <-renderDataTable(datatable(combined_resultindependent, rownames = FALSE, options = list(autoWidth=TRUE, scrollX=TRUE, scrollY=400, searching=TRUE, pageLength=25, rowCallback = JS(underlineCellsCols(c(1),c(0)))))
+                                          %>% formatStyle(colnames(combined_resultindependent)[4], backgroundColor = styleEqual(c(paste("Cluster_", names(data.object()@plot[[6]]$Cluster)[names(data.object()@plot[[6]]$Cluster)!=0], sep="")), c(data.object()@plot[[6]]$Cluster[data.object()@plot[[6]]$Cluster!="white"])))
+                                          %>% formatStyle(colnames(combined_resultindependent)[1], color = "blue"))
+      }else{
+        output$independentOutput <-renderDataTable(datatable(combined_resultindependent, rownames = FALSE, options = list(autoWidth=TRUE, scrollX=TRUE, scrollY=400, searching=TRUE, pageLength=25))
+                                                   %>% formatStyle(colnames(combined_resultindependent)[3], backgroundColor = styleEqual(c(paste("Cluster_", names(data.object()@plot[[6]]$Cluster)[names(data.object()@plot[[6]]$Cluster)!=0], sep="")), c(data.object()@plot[[6]]$Cluster[data.object()@plot[[6]]$Cluster!="white"]))))
+      }
+      genesFinalIndependent<-calculategenestableinde(data.object(),combined_resultindependent)
+      if(unique(as.character(data.object()@metadata[,"structure"]))!="SYMBOL"){
+        genesFinalIndependent<-combineSymbolInfo(genesFinalIndependent, genes.symbolinfo())
+      }
+      output$genesInfoIndependent<-renderDataTable(datatable(genesFinalIndependent, rownames = FALSE, filter="top", options = list(autoWidth=TRUE, scrollX=TRUE, scrollY=400, searching=TRUE, dom='lrtip', pageLength=10, rowCallback = JS(underlineCellsCols(c(1),c(0)))))
+                                                  %>% formatStyle(colnames(genesFinalIndependent)[1], color = "blue"))
+      
+      output$barplotIndependent<-renderPlot(createBarPlotIndependent(data.object(), combined_resultindependent, groupchoices[1], uniquePathways=uniquepathwaysperform()))
+      
+      #Calculate ORA in independent results
+      oraResultsIndependent<-do.call("rbind", lapply(groupchoices, calculateORAindependent, object=data.object(), independent_info=combined_resultindependent, uniquePathways=uniquepathwaysperform()))
+      independent.infoORA<<-reactive({oraResultsIndependent})
+      output$independentORAOutput<-renderDataTable(datatable(oraResultsIndependent, rownames = FALSE, options = list(autoWidth=TRUE, scrollX=TRUE, scrollY=400, searching=TRUE, pageLength=10, rowCallback = JS(underlineCellsCols(c(1),c(0)))))
+                                                  %>% formatStyle(colnames(oraResultsIndependent)[9], backgroundColor = styleEqual(c(paste("Cluster_", names(data.object()@plot[[6]]$Cluster)[names(data.object()@plot[[6]]$Cluster)!=0], sep="")), c(data.object()@plot[[6]]$Cluster[data.object()@plot[[6]]$Cluster!="white"])))
+                                                  %>% formatStyle(colnames(oraResultsIndependent)[1], color = "blue"))
+      
+      update_modal_progress(value=0.8, text="Run seriation-based analysis")
+      
+      if(wordcloudindependent){
+        wordcloudannotationIndependent<-PerformORAGOperCluster_shiny(independent.object, uniquePathways=uniquepathwaysperform(), clusterIndependent=TRUE)
+        wordcloudinfoIndependent<<-reactive({wordcloudannotationIndependent})
+        output$wordcloudCheckboxIndependent <- renderUI({checkboxInput("wordcloudIndependent", "Enable Wordcloud", value=FALSE)})
+      }else{
+        output$wordcloudCheckboxIndependent <- renderUI({tagList()})
+        #plot heatmap independent
+        keywords_ora_independent<-calculateKeywordsORA(independent.infoORA())
+        independentoutput<<-reactive({PlotPathwayCluster_shiny(independent.object, doORA = TRUE, wordcloud = FALSE, uniquePathways = uniquepathwaysperform(), keywords_ora_inde=keywords_ora_independent)})
+        output$independentPlot<-renderPlot(independentoutput())
+      }
+      
+      #create plot
+      update_modal_progress(value=0.9, text="Run seriation-based analysis")
+      remove_modal_progress()
+      showTab(inputId = "tabs", target = "Heatmap_S", select=TRUE)
+      if((data.object()@metadata[1,"organism"]!="org.Mm.eg.db")){
+        #for mouse data hide tissue enrichment analysis
+        showTab(inputId = "tabsindependent", target = "Tissue")
+      }
+      showTab(inputId = "tabsindependent", target = "ORA")
+      showTab(inputId = "tabsindependent", target = "Genes")
   })
-
+  
   ###########################
   ###########################
-  #CALCULATE TISSUE ENRICHMENT INDEPENDENT
+  #CALCULATE TISSUE ENRICHMENT SERIATION-BASED
   observeEvent(input$calculateTissueEnrichmentIndependent, {
     if (is.null(input$tissuesselectedindependent)){
       shinyalert(title = "Missing tissue", text = "Please, select 1 or more tissues.", type = "error")
@@ -1416,44 +1570,42 @@ server <- function(input, output, session) {
       update_modal_progress(value=0.5, text="Calculate tissue enrichment")
       load("databases/TissueLocalDatabase15.RData")
       load("databases/dic.rda")
-
+      
       localDatabase15<-localDatabase15[input$tissuesselectedindependent]
-      tissue.objectindependent <- TissueExpressionPerGeneSet(data.object(), localDatabase = localDatabase15, dic=dic, uniquePathways=uniquepathwaysperform(), clusterIndependent=TRUE)
+      tissue.objectindependent <- TissueExpressionPerGeneSet_shiny(data.object(), localDatabase = localDatabase15, dic=dic, uniquePathways=uniquepathwaysperform(), clusterIndependent=TRUE)
       tissue.objectindependent@dfTissueIndependent<-round(tissue.objectindependent@dfTissueIndependent,3)
       tissue.objectindependent@dfTissueIndependent<-na_replace(tissue.objectindependent@dfTissueIndependent,0)
       data.object<<-reactive({tissue.objectindependent})
-
+      
       update_modal_progress(value=0.7, text="Calculate tissue enrichment")
       tissueDataIndependent<-data.frame(rownames(tissue.objectindependent@dfTissueIndependent), tissue.objectindependent@dfTissueIndependent)
       colnames(tissueDataIndependent)[1]<-"Tissue"
       output$tissueOutputIndependent<-renderDataTable(datatable(tissueDataIndependent, rownames = FALSE, options = list(autoWidth=TRUE, scrollX=TRUE, scrollY=400, searching=TRUE, pageLength=10)))
-
-      #output$tissueIntro<-renderUI({tags$p("Tissue enrichment results per cluster (Cluster_number..number of genes):")})
-
+     
       showTab(inputId = "tabs", target = "Tissue_S", select=TRUE)
-
+      
       update_modal_progress(value=0.9)
       #plot tissue plots
-      tissueoutputindependent<<-reactive({PlotTissueExpression(tissue.objectindependent, all = FALSE, uniquePathways=uniquepathwaysperform(), clusterIndependent=TRUE)})
+      tissueoutputindependent<<-reactive({PlotTissueExpression_shiny(tissue.objectindependent, all = FALSE, uniquePathways=uniquepathwaysperform(), clusterIndependent=TRUE)})
       output$tissuePlotIndependent<-renderPlot(tissueoutputindependent())
-
+      
       rm(localDatabase15)
       rm(dic)
       remove_modal_progress()
     }
-
+    
   })
-
-
+  
+  ###########################
   ###########################
   #BREAK UP CLUSTER
   observeEvent(input$breakup, {
-
+    
     show_modal_progress_line(text="Calculate subclusters (1/2)")
     update_modal_progress(value=0.2)
     if (input$nbreakup.cluster=="Automatic"){
       new.object<-data.object()
-
+      
       if(uniquepathwaysperform()){
         RR<-new.object@DataPathways.RR
         breakup.cluster<-sub("Cluster_","",input$breakup.cluster)
@@ -1469,7 +1621,7 @@ server <- function(input, output, session) {
       optimalCluster<-input$nbreakup.cluster
     }
     update_modal_progress(value=0.5)
-    data_break_up <- BreakUpCluster(Object = data.object(), breakup.cluster = input$breakup.cluster, sub.cluster=optimalCluster, uniquePathways=uniquepathwaysperform())
+    data_break_up <- BreakUpCluster_shiny(Object = data.object(), breakup.cluster = input$breakup.cluster, sub.cluster=optimalCluster, uniquePathways=uniquepathwaysperform())
     if(uniquepathwaysperform()){
       data_break_up <- transferinfo(data_break_up)
       clusterchoices<-paste("Cluster_", names(data_break_up@plot$aka3Unique$Cluster), sep="")
@@ -1482,18 +1634,16 @@ server <- function(input, output, session) {
     }
 
     data.object<<-reactive({data_break_up})
-
+    
     annotationsUpdate<-annotations()
     if("Term" %in% colnames(annotations())){
-      #wordcloudperform=T
       annotationsUpdate$Cluster<-data_break_up@Data[[1]]$cluster[which(data_break_up@Data[[1]]$Pathways %in% annotationsUpdate$ID)]
     }else{
-      #wordcloudperform=F
       annotationsUpdate$Cluster<-data_break_up@Data[[1]]$cluster[which(data_break_up@Data[[1]]$Pathways %in% annotationsUpdate$Pathways)]
     }
-
+    
     annotations<<-reactive({annotationsUpdate})
-
+    
     genesFinal<-calculategenestable(data.object(), uniquepathwaysperform())
     if(unique(as.character(data.object()@metadata[,"structure"]))!="SYMBOL"){
       genesFinal<-combineSymbolInfo(genesFinal, genes.symbolinfo())
@@ -1502,21 +1652,20 @@ server <- function(input, output, session) {
     genesfinal.info<<-reactive({genesFinal})
     output$genesInfo <-renderDataTable(datatable(genesFinal, rownames = FALSE, filter="top", options = list(dom='lrtip', pageLength=10, rowCallback = JS(underlineCellsCols(c(1),c(0)))))
                                        %>% formatStyle(colnames(genesFinal)[1], color = "blue"))
-
+    
     #put check box of cluster
     output$checkboxCluster <- renderUI({
       clusterchoices_all<-c("Uncheck all", clusterchoices)
-      checkboxGroupInput("optionCluster", label = "", choices=clusterchoices_all, selected = clusterchoices, inline=TRUE)
+       checkboxGroupInput("optionCluster", label = "", choices=clusterchoices_all, selected = clusterchoices, inline=TRUE)
     })
-
+    
     update_modal_progress(value=0.7)
-
+    
     output$barplot<-renderPlot(createBarPlot(data.object(), clusterchoices[1], uniquePathways=uniquepathwaysperform()))
-
+    
     updateSelectInput(session, "breakup.cluster", choices = clusterchoices)
     updateSelectInput(session, "summary.cluster", choices = clusterchoices)
 
-    #showModal(modalDialog("ORA per newcluster (2/2)", footer=NULL))
     update_modal_progress(text="ORA per new subcluster (2/2)", value=0.8)
     #calculate ORA
     clusterpattern<-paste(sub("Cluster_","",input$breakup.cluster), ".", sep="")
@@ -1526,20 +1675,21 @@ server <- function(input, output, session) {
     oraResults<-rbind(oraResults, oraTemp)
     oraResults<-oraResults[order(oraResults$Cluster),]
     ora.objectALL<<-reactive({oraResults})
-
+    
     oraTopTemp<-ora.object()
     oraTopTemp<-oraTopTemp[oraTopTemp$Cluster!=input$breakup.cluster,]
     oraResultsTop<-do.call("rbind", lapply(grep(clusterpattern,unique(clusters), value = TRUE), topORA, ora=oraResults, top=as.integer(input$top)))
     oraResultsTop<-rbind(oraResultsTop, oraTopTemp)
     oraResultsTop<-oraResultsTop[order(oraResultsTop$Cluster),]
     ora.object<<-reactive({oraResultsTop})
-
+    
     #create plots
-    if(wordcloudperform()){
-      wordcloudinfo<<-reactive({PerformORAGOperCluster(data.object(), uniquePathways=uniquepathwaysperform(), clusterIndependent=FALSE)})
+    if(checkGO(data.object())){
+      wordcloudannotation<-PerformORAGOperCluster_shiny(data.object(), uniquePathways=uniquepathwaysperform(), clusterIndependent=FALSE)
+      wordcloudinfo<<-reactive({wordcloudannotation})
     }
     keywords_ora<-calculateKeywordsORA(ora.objectALL())
-    heatmapoutput<<-reactive({PlotGeneSets(Object = data.object(), doORA = T, wordcloud = wordcloudperform(), wordclouds=wordcloudinfo(), uniquePathways=uniquepathwaysperform(), keywords_ora=keywords_ora)})
+    heatmapoutput<<-reactive({PlotGeneSets_shiny(Object = data.object(), doORA = T, wordcloud = wordcloudperform(), wordclouds=wordcloudinfo(), uniquePathways=uniquepathwaysperform(), keywords_ora=keywords_ora)})
     output$heatmap<-renderPlot(heatmapoutput())
 
     #reset tissue results
@@ -1548,36 +1698,42 @@ server <- function(input, output, session) {
     output$tissueOutput<-renderDataTable(NULL)
     output$tissueIntro<-renderUI({tags$p("Choose specific tissues for performing enrichment analysis (the tissues were selected from", HTML("<a href='https://gtexportal.org/home/' target='_blank'>here</a>"), "):")})
     remove_modal_progress()
-
+    
   })
-
+  
   ###########################
-  #UPLOAD RESULTS
+  ###########################
+  #UPLOAD RESULTS FROM SHINY OR R PACKAGE
   observeEvent(input$uploadResult, {
-
+    
     if(is.null(input$fileRdata$datapath)){
       shinyalert(title = "Missing file", text = "Please, insert Rdata file.", type = "error")
     }else{
-
+      
       if((input$uploadfrom=="package")&&((is.null(input$uploadfilters))||(is.null(input$uploadnameobject)))){
         shinyalert(title = "Missing input data", text = "Please, specify object name and pathays included.", type = "error")
       }else{
         show_modal_progress_line(text="Uploading")
         load(input$fileRdata$datapath)
-
+        
         #load data
         if(input$uploadfrom=="shiny"){
           data.object<<-reactive({data_to_save})
           annotations<<-reactive({annotations_to_save})
           ora.objectALL<<-reactive({ora_to_save})
           uniquepathwaysperform<<-reactive({unique_pathways})
+          wordcloudinfo<<-reactive({wordcloudinfo})
+          wordcloudinfoIndependent<<-reactive({wordcloudinfoIndependent})
 
         }else{
           data.object<<-reactive({get(input$uploadnameobject)})
+          
           if(input$uploadfilters=="uniquepathways"){
             uniquepathwaysperform(TRUE)
+            wordcloudinfo<<-reactive({data.object()@functionalAnnot$Pathway})
           }else{
             uniquepathwaysperform(FALSE)
+            wordcloudinfo<<-reactive({data.object()@functionalAnnot$Geneset})
           }
           if(uniquepathwaysperform()){
             updateobject <- transferinfo(data.object())
@@ -1590,9 +1746,8 @@ server <- function(input, output, session) {
           }
           data.object<<-reactive({updateobject})
         }
-
+        
         update_modal_progress(value=0.2)
-        #########
         if(uniquepathwaysperform()){
           clusterchoices<-paste("Cluster_", names(data.object()@plot$aka3Unique$Cluster), sep="")
           clusterchoices<-clusterchoices[order(clusterchoices)]
@@ -1602,13 +1757,13 @@ server <- function(input, output, session) {
           clusterchoices<-paste("Cluster_", names(data.object()@plot$aka3$Cluster), sep="")
           clusters<-unique(data.object()@plot$aka2$Cluster)
         }
-
+    
         #put check box of cluster
         output$checkboxCluster <- renderUI({
           clusterchoices_all<-c("Uncheck all", clusterchoices)
           checkboxGroupInput("optionCluster", label = "", choices=clusterchoices_all, selected = clusterchoices, inline=TRUE)
         })
-
+        
         #genes info
         genesFinal<-calculategenestable(data.object(), uniquepathwaysperform())
         if(unique(as.character(data.object()@metadata[,"structure"]))!="SYMBOL"){
@@ -1619,7 +1774,7 @@ server <- function(input, output, session) {
         genesfinal.info<<-reactive({genesFinal})
         output$genesInfo <-renderDataTable(datatable(genesFinal, rownames = FALSE, filter="top", options = list(dom='lrtip', pageLength=10, rowCallback = JS(underlineCellsCols(c(1),c(0)))))
                                            %>% formatStyle(colnames(genesFinal)[1], color = "blue"))
-
+        
         if(input$uploadfrom=="shiny"){
           #ora results
           oraResultsTop<-do.call("rbind", lapply(clusters, topORA, ora=ora.objectALL(), top=as.integer(input$top)))
@@ -1635,7 +1790,7 @@ server <- function(input, output, session) {
               output$independentOutput <-renderDataTable(datatable(independent.info(), rownames = FALSE, options = list(autoWidth=TRUE, scrollX=TRUE, scrollY=400, searching=TRUE, pageLength=25, rowCallback = JS(underlineCellsCols(c(1),c(0)))))
                                                          %>% formatStyle(colnames(independent.info())[4], backgroundColor = styleEqual(c(paste("Cluster_", names(data.object()@plot[[6]]$Cluster)[names(data.object()@plot[[6]]$Cluster)!=0], sep="")), c(data.object()@plot[[6]]$Cluster[data.object()@plot[[6]]$Cluster!="white"])))
                                                          %>% formatStyle(colnames(independent.info())[1], color = "blue"))
-
+              
             }else{
               output$independentOutput <-renderDataTable(datatable(independent.info(), rownames = FALSE, options = list(autoWidth=TRUE, scrollX=TRUE, scrollY=400, searching=TRUE, pageLength=25))
                                                          %>% formatStyle(colnames(independent.info())[4], backgroundColor = styleEqual(c(paste("Cluster_", names(data.object()@plot[[6]]$Cluster)[names(data.object()@plot[[6]]$Cluster)!=0], sep="")), c(data.object()@plot[[6]]$Cluster[data.object()@plot[[6]]$Cluster!="white"]))))
@@ -1644,7 +1799,7 @@ server <- function(input, output, session) {
             output$independentORAOutput<-renderDataTable(datatable(independent.infoORA(), rownames = FALSE, options = list(autoWidth=TRUE, scrollX=TRUE, scrollY=400, searching=TRUE, pageLength=10, rowCallback = JS(underlineCellsCols(c(1),c(0)))))
                                                          %>% formatStyle(colnames(independent.infoORA())[9], backgroundColor = styleEqual(c(paste("Cluster_", names(data.object()@plot[[6]]$Cluster)[names(data.object()@plot[[6]]$Cluster)!=0], sep="")), c(data.object()@plot[[6]]$Cluster[data.object()@plot[[6]]$Cluster!="white"])))
                                                          %>% formatStyle(colnames(independent.infoORA())[1], color = "blue"))
-
+            
             genesFinalIndependent<-calculategenestableinde(data.object(),independent.info())
             if(unique(as.character(data.object()@metadata[,"structure"]))!="SYMBOL"){
               genesFinalIndependent<-combineSymbolInfo(genesFinalIndependent, genes.symbolinfo())
@@ -1655,13 +1810,13 @@ server <- function(input, output, session) {
             shinyjs::show("summary.independentgroup")
             #create plot
             keywords_ora_independent<-calculateKeywordsORA(independent.infoORA())
-            independentoutput<<-reactive({PlotPathwayCluster(data.object(), doORA = TRUE, wordcloud = FALSE, uniquePathways = uniquepathwaysperform(), keywords_ora_inde=keywords_ora_independent)})
+            independentoutput<<-reactive({PlotPathwayCluster_shiny(data.object(), doORA = TRUE, wordcloud = FALSE, uniquePathways = uniquepathwaysperform(), keywords_ora_inde=keywords_ora_independent)})
             output$independentPlot<-renderPlot(independentoutput())
             if((data.object()@metadata[1,"organism"]=="org.Mm.eg.db")){
               #for mouse data hide tissue enrichment analysis
               hideTab(inputId = "tabsindependent", target = "Tissue")
             }
-
+            
           }else{
             hideTab(inputId = "tabs", target = "Heatmap_S")
             hideTab(inputId = "tabs", target = "Tissue_S")
@@ -1670,7 +1825,7 @@ server <- function(input, output, session) {
             hideTab(inputId = "tabsindependent", target = "Tissue")
           }
         }else{
-          #R packageeee
+          #R package
           #calculate annotations
           if((is.null(annotations())) && (checkGO(data.object())==TRUE)){
             resultAnnotations<-as.data.frame(str_split_fixed(as.data.frame(unlist(lapply(data.object()@Data[[1]][,"Pathways"],getterm)))[,1],"__",3))
@@ -1683,12 +1838,17 @@ server <- function(input, output, session) {
             colnames(resultAnnotationsFinal)[c(3,4)]<-c("Group", "Cluster")
             annotations<<-reactive({resultAnnotationsFinal})
           }
-          #calulate ORA in parallel
-          oraResults<-do.call("rbind", lapply(clusters, calculateORA, object=data.object(), uniquePathways=uniquepathwaysperform()))
+          if(uniquepathwaysperform()){
+            oraResults <- extractORAinfo(data.object()@functionalAnnot$Pathway$ORA, FALSE)
+          }else{
+            oraResults <- extractORAinfo(data.object()@functionalAnnot$Geneset$ORA, FALSE)
+          }
           ora.objectALL<<-reactive({oraResults})
+          
           oraResultsTop<-do.call("rbind", lapply(clusters, topORA, ora=oraResults, top=as.integer(input$top)))
           ora.object<<-reactive({oraResultsTop})
-          #add independent info
+
+          #add Sseriation-based info
           if (!is.null(data.object()@cIndependentMethod)){
             shinyjs::hide("runIndependent")
             output$independentIntro<-renderUI({tags$p("")})
@@ -1696,13 +1856,16 @@ server <- function(input, output, session) {
               temp.object<-data.object()
               temp.object@cIndependentMethod[[1]][[1]]<-temp.object@cIndependentMethod[[2]][[1]]
               data.object<<-reactive({temp.object})
+              wordcloudinfoIndependent<<-reactive({data.object()@functionalAnnotIndependent$Pathway})
+            }else{
+              wordcloudinfoIndependent<<-reactive({data.object()@functionalAnnotIndependent$Geneset})
             }
             if(checkGO(data.object())){
               wordcloudindependent<-TRUE
             }else{
               wordcloudindependent<-FALSE
             }
-            resultindependent<-ShowPathwayCluster(data.object(), uniquePathways = uniquepathwaysperform())
+            resultindependent<-ShowPathwayCluster_shiny(data.object(), uniquePathways = uniquepathwaysperform())
             annotated_resultindependent <- lapply(seq_along(resultindependent), function(i,uniquePathways = uniquepathwaysperform(), goids=wordcloudindependent) {
               go_list <- resultindependent[[i]]
               if(uniquePathways){
@@ -1728,35 +1891,39 @@ server <- function(input, output, session) {
                   annotated_terms<-annotated_terms[,-1]
                 }
               }
-
+              
               return(annotated_terms)
             })
             combined_resultindependent<-do.call(rbind, annotated_resultindependent)
             groupchoices<-unique(combined_resultindependent$Cluster)
-
+            
             independent.info<<-reactive({combined_resultindependent})
             output$independentOutput<-renderDataTable((datatable(combined_resultindependent, rownames = FALSE, options = list(searching=TRUE, pageLength=10)))
-                                                      %>% formatStyle(colnames(independent.info())[4], backgroundColor = styleEqual(c(paste("Cluster_", names(data.object()@plot[[6]]$Cluster)[names(data.object()@plot[[6]]$Cluster)!=0], sep="")), c(data.object()@plot[[6]]$Cluster[data.object()@plot[[6]]$Cluster!="white"]))))
-
+                                                        %>% formatStyle(colnames(independent.info())[4], backgroundColor = styleEqual(c(paste("Cluster_", names(data.object()@plot[[6]]$Cluster)[names(data.object()@plot[[6]]$Cluster)!=0], sep="")), c(data.object()@plot[[6]]$Cluster[data.object()@plot[[6]]$Cluster!="white"]))))
+            
             genesFinalIndependent<-calculategenestableinde(data.object(),independent.info())
             if(unique(as.character(data.object()@metadata[,"structure"]))!="SYMBOL"){
               genesFinalIndependent<-combineSymbolInfo(genesFinalIndependent, genes.symbolinfo())
             }
             output$genesInfoIndependent<-renderDataTable(datatable(genesFinalIndependent, rownames = FALSE, filter="top", options = list(autoWidth=TRUE, scrollX=TRUE, scrollY=400, searching=TRUE, dom='lrtip', pageLength=10, rowCallback = JS(underlineCellsCols(c(1),c(0)))))
                                                          %>% formatStyle(colnames(genesFinalIndependent)[1], color = "blue"))
-            oraResultsIndependent<-do.call("rbind", lapply(groupchoices, calculateORAindependent, object=data.object(), independent_info=combined_resultindependent, uniquePathways=uniquepathwaysperform()))
+            if(uniquepathwaysperform()){
+              oraResultsIndependent <- extractORAinfo(data.object()@functionalAnnotIndependent$Pathway$ORA, TRUE)
+            }else{
+              oraResultsIndependent <- extractORAinfo(data.object()@functionalAnnotIndependent$Geneset$ORA, TRUE)
+            }
             independent.infoORA<<-reactive({oraResultsIndependent})
             output$independentORAOutput<-renderDataTable(datatable(oraResultsIndependent, rownames = FALSE, options = list(autoWidth=TRUE, scrollX=TRUE, scrollY=400, searching=TRUE, pageLength=10, rowCallback = JS(underlineCellsCols(c(1),c(0)))))
                                                          %>% formatStyle(colnames(oraResultsIndependent)[9], backgroundColor = styleEqual(c(paste("Cluster_", names(data.object()@plot[[6]]$Cluster)[names(data.object()@plot[[6]]$Cluster)!=0], sep="")), c(data.object()@plot[[6]]$Cluster[data.object()@plot[[6]]$Cluster!="white"])))
                                                          %>% formatStyle(colnames(oraResultsIndependent)[1], color = "blue"))
-
-
+            
+            
             updateSelectInput(session, "summary.independentgroup", choices = groupchoices)
             shinyjs::show("summary.independentgroup")
-
+            
             #create plot
             keywords_ora_independent<-calculateKeywordsORA(independent.infoORA())
-            independentoutput<<-reactive({PlotPathwayCluster(data.object(), doORA = TRUE, wordcloud = FALSE, uniquePathways = uniquepathwaysperform(), keywords_ora_inde=keywords_ora_independent)})
+            independentoutput<<-reactive({PlotPathwayCluster_shiny(data.object(), doORA = TRUE, wordcloud = FALSE, uniquePathways = uniquepathwaysperform(), keywords_ora_inde=keywords_ora_independent)})
             output$independentPlot<-renderPlot(independentoutput())
           }else{
             hideTab(inputId = "tabs", target = "Heatmap_S")
@@ -1764,14 +1931,14 @@ server <- function(input, output, session) {
         }
 
         update_modal_progress(value=0.5)
-        #tissue independent
+        #tissue seriation-based
         if(!is.null(data.object()@dfTissueIndependent)){
           temp.object<-data.object()
           if(input$uploadfrom=="package"){
             if(uniquepathwaysperform()){
               temp.object@dfTissueIndependent<- temp.object@dfTissueIndependent$Pathway
             }else{
-              temp.object@dfTissueIndependent<- temp.object@dfTissueIndependent$Geneset
+              temp.object@dfTissueIndependent<- temp.object@dfTissueIndependent$Geneset 
             }
           }
           temp.object@dfTissueIndependent<-round(temp.object@dfTissueIndependent,3)
@@ -1780,12 +1947,12 @@ server <- function(input, output, session) {
           tissueDataIndependent<-data.frame(rownames(data.object()@dfTissueIndependent), data.object()@dfTissueIndependent)
           colnames(tissueDataIndependent)[1]<-"Tissue"
           output$tissueOutputIndependent<-renderDataTable(datatable(tissueDataIndependent, rownames = FALSE, options = list(autoWidth=TRUE, scrollX=TRUE, scrollY=400, searching=TRUE, pageLength=10)))
-          tissueoutputindependent<<-reactive({PlotTissueExpression(data.object(), all = FALSE, uniquePathways=uniquepathwaysperform(), clusterIndependent=TRUE)})
+          tissueoutputindependent<<-reactive({PlotTissueExpression_shiny(data.object(), all = FALSE, uniquePathways=uniquepathwaysperform(), clusterIndependent=TRUE)})
           output$tissuePlotIndependent<-renderPlot(tissueoutputindependent())
         }else{
           hideTab(inputId = "tabs", target = "Tissue_S")
         }
-
+        
         #download data and plots
         output$saveObject <- renderUI({
           downloadButton("save.object","Results")
@@ -1798,30 +1965,31 @@ server <- function(input, output, session) {
         output$downloadDataFormats <- renderUI({
           dropdownButton(inputId="download.plot.format",label="Images", circle=FALSE, radioButtons("format", label="", choices = c("jpg","png","pdf"), selected = NULL), downloadButton("download.plots","Download plots"))
         })
-
+        
         nclusters<-length(clusters)
         updateNumericInput(session, inputId="cluster", value=nclusters)
-
+        
         if(checkGO(data.object())){
           wordcloudperform(TRUE)
-          wordcloudinfo<<-reactive({PerformORAGOperCluster(data.object(), uniquePathways=uniquepathwaysperform(), clusterIndependent=FALSE)})
           output$wordcloudCheckbox <- renderUI({checkboxInput("wordcloud", "Enable Wordcloud", value=FALSE)})
+          output$wordcloudCheckboxIndependent <- renderUI({checkboxInput("wordcloudIndependent", "Enable Wordcloud", value=FALSE)})
         }else{
           wordcloudperform(FALSE)
           output$wordcloudCheckbox <- renderUI({tagList()})
+          output$wordcloudCheckboxIndependent <- renderUI({tagList()})
           #create plots
           keywords_ora<-calculateKeywordsORA(ora.objectALL())
-          heatmapoutput<<-reactive({PlotGeneSets(Object = data.object(), doORA = T, wordcloud = wordcloudperform(), uniquePathways=uniquepathwaysperform(), keywords_ora=keywords_ora)})
+          heatmapoutput<<-reactive({PlotGeneSets_shiny(Object = data.object(), doORA = T, wordcloud = wordcloudperform(), uniquePathways=uniquepathwaysperform(), keywords_ora=keywords_ora)})
           output$heatmap<-renderPlot(heatmapoutput())
         }
         update_modal_progress(value=0.7)
-
+        
         output$barplot<-renderPlot(createBarPlot(data.object(), clusterchoices[1], uniquePathways=uniquepathwaysperform()))
         update_modal_progress(value=0.9)
-
+        
         updateSelectInput(session, "breakup.cluster", choices = clusterchoices)
         updateSelectInput(session, "summary.cluster", choices = clusterchoices)
-
+        
         ##check if tissue is perfomed for dependent analysis
         if ((!is.null(data.object()@dfTissue))&&(length(data.object()@dfTissue)>0)){
           temp.object<-data.object()
@@ -1838,13 +2006,12 @@ server <- function(input, output, session) {
           tissueData<-data.frame(rownames(data.object()@dfTissue), data.object()@dfTissue)
           colnames(tissueData)[1]<-"Tissue"
           output$tissueOutput<-renderDataTable(datatable(tissueData, rownames = FALSE, options = list(searching=TRUE, pageLength=10)))
-          #shinyjs::hide("calculateTissueEnrichment")
 
           output$tissueIntro<-renderUI({tags$p("Tissue enrichment results per cluster (Cluster_number..number of terms):")})
           showTab(inputId = "tabs", target = "Tissue")
 
           #plot tissue plots
-          tissueoutput<<-reactive({PlotTissueExpression(data.object(), all = FALSE, uniquePathways=uniquepathwaysperform(), clusterIndependent=FALSE)})
+          tissueoutput<<-reactive({PlotTissueExpression_shiny(data.object(), all = FALSE, uniquePathways=uniquepathwaysperform(), clusterIndependent=FALSE)})
           output$tissuePlot<-renderPlot(tissueoutput())
         }else{
           #hide tissue results
@@ -1852,12 +2019,11 @@ server <- function(input, output, session) {
         }
 
         showTab(inputId = "tabs3", target="tabpanelresult", select=TRUE)
-        #updateTabsetPanel(session, "tabs3", selected = "tabpanelresult", args = list(tabpanelresult = "Results"))
         runjs('
               // Change the tab label when the button is clicked
               $("#tabs3 a[data-value=\'tabpanelresult\']").text("Results");
               ')
-
+    
         if(unique(data.object()@metadata$organism)=="org.Mm.eg.db"){
           #for mouse data hide tissue enrichment analysis
           hideTab(inputId = "tabs2", target = "Tissue enrichment")
@@ -1865,7 +2031,7 @@ server <- function(input, output, session) {
         shinyjs::toggle("main1")
         shinyjs::toggle("main2")
         remove_modal_progress()
-
+        
         #reset upload inputs
         updateRadioButtons(session,"uploadfrom", selected = character(0))
         updateRadioButtons(session,"uploadfilters", selected = character(0))
@@ -1874,10 +2040,10 @@ server <- function(input, output, session) {
       }
     }
   })
-
+  
   ###########################
   ###########################
-  #DOWNLOAD
+  #DOWNLOAD FIGURES, TEMPLATE, DATA AND RESULTS
   output$save.object <- downloadHandler(
     filename = function() {
       paste("GSC_", format(Sys.Date(), "%Y%m%d"), ".RData", sep = "")
@@ -1890,38 +2056,49 @@ server <- function(input, output, session) {
       unique_pathways <- uniquepathwaysperform()
       independent_to_save<-independent.info()
       independent_ora_to_save<-independent.infoORA()
-      # Check the structure of data_to_save
-      #str(data_to_save)
+      wordcloudinfo<-wordcloudinfo()
+      wordcloudinfoIndependent<-wordcloudinfoIndependent()
       # Save the data to the file
-      save(data_to_save, annotations_to_save, ora_to_save, unique_pathways, independent_to_save, independent_ora_to_save, file = file)
+      save(data_to_save, annotations_to_save, ora_to_save, unique_pathways, independent_to_save, independent_ora_to_save, wordcloudinfo, wordcloudinfoIndependent, file = file)
     }
   )
-
+  
   output$downloadTemplate <- downloadHandler(
     filename = "template.xls",
     content = function(file) {
       file.copy("source/template.xls",file)
     }
   )
-
+  
   output$downloadUserGuide <- downloadHandler(
     filename = "UserGuide.pdf",
     content = function(file) {
       file.copy("source/UserGuide.pdf",file)
     }
   )
-
+  
   output$download.plots<-downloadHandler(
     file = function() {
       paste('plots-', Sys.Date(), '.zip', sep = '')
     },
     content = function(file) {
-
+      
       nofile<-c()
       filenames<-c(paste("heatmap_plot.",input$format, sep=""),paste("tissue_plot.",input$format, sep=""), paste("heatmapS_plot.",input$format, sep=""), paste("tissueS_plot.",input$format, sep=""))
       # Save the heatmap plot
-      #ggsave(plot = as.ggplot(heatmapoutput()), filename = filenames[1], width = 30, unit = "cm", device = input$format)
-      ggsave(plot = as.ggplot(heatmapoutput()@ht_list[[1]]), filename = filenames[1], width = 30, height= 20, unit = "cm", device = input$format)
+      if (input$format == "pdf") {
+        pdf(file = filenames[1], width = 30/2.54, height = 20/2.54)  # Convert cm to inches
+        draw(heatmapoutput())
+        dev.off()
+      } else if (input$format == "png") {
+        png(filename = filenames[1], width = 30, height = 20, units = "cm", res = 300)
+        draw(heatmapoutput())
+        dev.off()
+      } else if (input$format == "jpg") {
+        jpeg(filename = filenames[1], width = 30, height = 20, units = "cm", res = 300)
+        draw(heatmapoutput())
+        dev.off()
+      }
       if(!is.null(tissueoutput())){
         # Save the tissue plot
         ggsave(plot = tissueoutput(), filename = filenames[2], width = 30, height= 20, unit = "cm", device = input$format)
@@ -1930,9 +2107,20 @@ server <- function(input, output, session) {
       }
       if(!is.null(independentoutput())){
         # Save the independent
-        ggsave(plot = as.ggplot(independentoutput()@ht_list[[1]]), filename = filenames[3], width = 30, height= 20, unit = "cm", device = input$format)
+        if (input$format == "pdf") {
+          pdf(file = filenames[3], width = 30/2.54, height = 20/2.54)  # Convert cm to inches
+          draw(independentoutput())
+          dev.off()
+        } else if (input$format == "png") {
+          png(filename = filenames[3], width = 30, height = 20, units = "cm", res = 300)
+          draw(independentoutput())
+          dev.off()
+        } else if (input$format == "jpg") {
+          jpeg(filename = filenames[3], width = 30, height = 20, units = "cm", res = 300)
+          draw(independentoutput())
+          dev.off()
+        }
       }else{
-
         nofile<-c(nofile,3)
       }
       if(!is.null(tissueoutputindependent())){
@@ -1948,7 +2136,7 @@ server <- function(input, output, session) {
       zip::zipr(zipfile = file, files = filenames)
     }
   )
-
+  
   output$download.data<-downloadHandler(
     filename = function() {
       paste0("data_", Sys.Date(), ".zip")
@@ -1956,7 +2144,7 @@ server <- function(input, output, session) {
     content = function(file) {
       # Create a temporary directory
       temp_dir <- tempdir()
-
+      
       if(!is.null(independent.info())){
         filenames <- c("dataClassic.csv", "dataSeriation.csv")
         #paths <- file.path(temp_dir, filenames)
@@ -1970,13 +2158,12 @@ server <- function(input, output, session) {
       }else{
         write.csv(data.object()@Data[[1]][,c(1:7,10)], filenames[1], row.names=FALSE) # add parentheses to data arg if reactive
       }
-
       # Zip the files
       zip(file, filenames)
-
+      
     }
   )
-
+  
   output$downloadGSE111385 <- downloadHandler(
     filename = "GSE111385_files.zip",
     content = function(file) {

@@ -1,14 +1,12 @@
-
-setGeneric(name="SetPathway",
+setGeneric(name="SetPathway_shiny",
            def=function(Object, nPathways="optimal", uniquePathways = FALSE)
            {
-             standardGeneric("SetPathway")
+             standardGeneric("SetPathway_shiny")
            }
 )
 
 
-setMethod(f="SetPathway",
-          signature="PathwayObject",
+setMethod(f="SetPathway_shiny",
           definition=function(Object, nPathways="optimal", uniquePathways = FALSE)
           {
             message("[=============================================================]")

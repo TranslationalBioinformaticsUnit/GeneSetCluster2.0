@@ -1,14 +1,12 @@
-
-setGeneric(name="TissueExpressionPerGeneSet",
+setGeneric(name="TissueExpressionPerGeneSet_shiny",
            def=function(Object, tissues="ALL", localDatabase=NULL, dic=NULL, clusterIndependent=FALSE, uniquePathways=F)
            {
-             standardGeneric("TissueExpressionPerGeneSet")
+             standardGeneric("TissueExpressionPerGeneSet_shiny")
            }
 )
 
 
-setMethod(f="TissueExpressionPerGeneSet",
-          signature="PathwayObject",
+setMethod(f="TissueExpressionPerGeneSet_shiny",
           definition=function(Object, tissues="ALL", localDatabase=NULL, dic=NULL, clusterIndependent=FALSE, uniquePathways=F)
           {
           message("[=========================================================]")
@@ -50,10 +48,10 @@ setMethod(f="TissueExpressionPerGeneSet",
           if (clusterIndependent)
           {
             checkIndependent(Object)
-            mol.unique.df <- GenesPerGeneSet(Object, uniquePathways = uniquePathways, clusterIndependent = TRUE)
+            mol.unique.df <- GenesPerGeneSet_shiny(Object, uniquePathways = uniquePathways, clusterIndependent = TRUE)
             #mol.unique.dfPathway <- GenesPerGeneSet(Object, uniquePathways = TRUE, clusterIndependent = TRUE)
           } else {
-            mol.unique.df <- GenesPerGeneSet(Object, uniquePathways = uniquePathways, clusterIndependent = FALSE)
+            mol.unique.df <- GenesPerGeneSet_shiny(Object, uniquePathways = uniquePathways, clusterIndependent = FALSE)
             #mol.unique.dfPathway <- GenesPerGeneSet(Object, uniquePathways = TRUE, clusterIndependent = FALSE)
           }
 

@@ -1,4 +1,4 @@
-ManageGeneSets <- function(Object, exclude.type="", keep.type="")
+ManageGeneSets_shiny <- function(Object, exclude.type="", keep.type="")
 {
 
   message("[=========================================================]")

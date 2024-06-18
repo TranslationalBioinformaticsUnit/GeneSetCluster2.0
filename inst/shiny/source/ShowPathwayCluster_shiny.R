@@ -1,17 +1,20 @@
 
-setGeneric(name="ShowPathwayCluster",
+setGeneric(name="ShowPathwayCluster_shiny",
            def=function(Object, cluster = "ALL", nPathway = 4, uniquePathways = FALSE)
            {
-             standardGeneric("ShowPathwayCluster")
+             standardGeneric("ShowPathwayCluster_shiny")
            }
 )
 
 
 
-setMethod(f="ShowPathwayCluster",
-          signature = "PathwayObject",
+setMethod(f="ShowPathwayCluster_shiny",
           definition = function(Object, cluster="ALL", nPathway = 4, uniquePathways = FALSE)
 {
+
+  message("[=============================================================]")
+  message("[<<<<               ShowPathwayCluster START                >>>>>]")
+  message("---------------------------------------------------------------")
   if (is.null(Object@cIndependentMethod))
   {
     message("The cluster independent methos is not defines. Please firstly run ClusterIndependentGeneSet in order to select the ordering method.")
@@ -79,6 +82,10 @@ setMethod(f="ShowPathwayCluster",
   } else {
     finalRes <- GOres[[cluster]]
   }
+
+  message("[=============================================================]")
+  message("[<<<<               ShowPathwayCluster END                >>>>>]")
+  message("---------------------------------------------------------------")
 
   return(finalRes)
 }

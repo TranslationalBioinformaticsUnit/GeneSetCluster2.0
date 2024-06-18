@@ -1,6 +1,14 @@
-###########
-#VERSION 28
-###########
+library(shiny)
+library(shinythemes)
+library(DT)
+library(shinydashboard)
+library(shinyWidgets)
+library(shinyBS)
+library(shinyjs)
+library(ggplot2)
+library(gridExtra)
+library(htmltools)
+library(shinyFiles)
 
 #data
 options(shiny.maxRequestSize=50*1024^3)
@@ -18,9 +26,7 @@ shinyjs.browseURL = function(url) {
   window.open(url,'_blank');
 }
 "
-
 tissues<-c("Adipose Tissue (Subcutaneous)","Artery (Aorta)","Brain (Cortex)","Colon (Sigmoid)","Kidney (Cortex)","Liver","Lung","Pancreas","Skeletal Muscle","Skin (Lower Leg)","Small Intestine (Terminal Ileum)","Stomach","Thyroid","Vagina","Whole Blood")
-
 
 # Define UI
 ui <- fluidPage(theme = shinytheme("flatly"),
@@ -56,7 +62,6 @@ ui <- fluidPage(theme = shinytheme("flatly"),
                                    br(),
                                    column(width=3,
                                          div(style="display:inline-block;",downloadButton("downloadTemplate", "Download template", style = "font-size: 12px; padding: 6px; background-color: #7EBC72; border-color: #7EBC72; color: white;")),
-                                         #actionButton(inputId="setExample", label="Run example", style = "font-size: 12px; padding: 6px; background-color: #70B7D7; border-color: #70B7D7; color: white;"),
                                          div(style="display:inline-block;", dropdownButton(status="runExamples",label="Examples", circle=FALSE, radioButtons("exampledataset", label="", choices = c("GSE111385 (GREAT)"="mousedataset","GSE198256 (GSEA)"="coviddataset"), selected = NULL), actionButton(inputId="setExample", label="Run example", icon=icon("play", lib = "glyphicon"), style = "font-size: 12px; padding: 6px; background-color: #70B7D7; border-color: #70B7D7; color: white;"), width="200px")),
                                          tags$head(tags$style(
                                            ".btn-runExamples{
@@ -141,6 +146,7 @@ ui <- fluidPage(theme = shinytheme("flatly"),
                                                           plotOutput("tissuePlot", height = "500px"),
                                                      ),
                                                      tabPanel("Heatmap_S",
+                                                          uiOutput("wordcloudCheckboxIndependent"),
                                                           plotOutput("independentPlot", height = "500px")
                                                      ),
                                                      tabPanel("Tissue_S",
@@ -276,7 +282,7 @@ ui <- fluidPage(theme = shinytheme("flatly"),
                                fluidRow(
                                  div(style="display:inline-block;", p("gene", style="color:white")),
                                  div(style="display:inline-block;",h4("R package vignette:")),
-                                 div(style="display:inline-block;",tags$a(href = "https://github.com/TranslationalBioinformaticsUnit/GeneSetCluster2.0", "link", target = "_blank"))
+                                 div(style="display:inline-block;",tags$a(href = "https://htmlpreview.github.io/?https://github.com/TranslationalBioinformaticsUnit/GeneSetCluster2.0/blob/main/inst/extdata/GeneSetCluster_vignette.html", "link", target = "_blank"))
                                ),
                                fluidRow(
                                  div(style="display:inline-block;", p("gene", style="color:white")),
@@ -293,7 +299,10 @@ ui <- fluidPage(theme = shinytheme("flatly"),
                             p("Department of Clinical Neuroscience"),
                             p("Center for Molecular Medicine"),
                             p("Karolinska Institutet"),
-                            p("17177 Stockholm, Sweden"),
+                           br(),
+                           p(tags$b("Asier Ortega-Legarreta: "), tags$a(href = "mailto:aortegal@navarra.es", "aortegal@navarra.es")),
+                           p("Translational Bioinformatic Unit"),
+                           p("Navarrabiomed"),
                           ),
                 ) # navbarPage
 ) # fluidPage

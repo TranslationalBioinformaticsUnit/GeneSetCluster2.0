@@ -1,14 +1,13 @@
-
-setGeneric(name="PlotPathwayCluster",
-           def=function(Object, doORA = TRUE, wordcloud = TRUE, uniquePathways = FALSE, keywords_ora_inde="")
+setGeneric(name="PlotPathwayCluster_shiny",
+           def=function(Object, doORA = TRUE, wordcloud = TRUE, wordclouds = "", uniquePathways = FALSE, keywords_ora_inde="")
            {
-             standardGeneric("PlotPathwayCluster")
+             standardGeneric("PlotPathwayCluster_shiny")
            }
 )
 
-setMethod(f="PlotPathwayCluster",
-          signature = "PathwayObject",
-          definition = function(Object, doORA = TRUE, wordcloud = TRUE, uniquePathways = FALSE, keywords_ora_inde="")
+
+setMethod(f="PlotPathwayCluster_shiny",
+          definition = function(Object, doORA = TRUE, wordcloud = TRUE, wordclouds = "", uniquePathways = FALSE, keywords_ora_inde="")
           {
 
           #check if cluster independent slot is null
@@ -31,7 +30,6 @@ setMethod(f="PlotPathwayCluster",
             # )
 
             #term <- Object@functionalAnnotIndependent$Pathway$GO
-
             res <- obtainDefCluster(mat_cor)
 
             go_id_list <- res[which(lapply(res,
@@ -76,6 +74,7 @@ setMethod(f="PlotPathwayCluster",
 
 
           if (wordcloud == TRUE) {
+            term<-wordclouds$GO
             if(is.null(unlist(term))) {
               message("The pathways not contain GO IDs. Then the Semantic enrichment wordcloud cannot be generated.")
               wordcloud <- FALSE

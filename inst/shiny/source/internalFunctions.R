@@ -575,12 +575,17 @@ obtainGOidList <- function(Object, uniquePathways, clusterIndependent)
     if (uniquePathways)
     {
       mat_sym <- scaleCorMatrix(Object@DataPathways.RR)
-      mat_cor <- mat_sym[Object@cIndependentMethod[[2]][[1]],
-                         Object@cIndependentMethod[[2]][[1]]]
+      #mat_cor <- mat_sym[Object@cIndependentMethod[[2]][[1]],
+      #                   Object@cIndependentMethod[[2]][[1]]]
+      mat_cor <- mat_sym[Object@cIndependentMethod[[1]][[1]],
+                         Object@cIndependentMethod[[1]][[1]]]
 
       res <- obtainDefCluster(mat_cor)
+      #go_id_list <- res[which(lapply(res,
+      #                         function(x) length(x))>=Object@plot$aka3IndependentUnique$optimalNumberPathway)]
+      
       go_id_list <- res[which(lapply(res,
-                               function(x) length(x))>=Object@plot$aka3IndependentUnique$optimalNumberPathway)]
+                                     function(x) length(x))>=getOptimalNumber(res))]
 
     } else {
       mat_sym <- scaleCorMatrix(Object@Data.RR)
@@ -588,11 +593,14 @@ obtainGOidList <- function(Object, uniquePathways, clusterIndependent)
                          Object@cIndependentMethod[[1]][[1]]]
 
       res <- obtainDefCluster(mat_cor)
+      #go_id_list <- res[which(lapply(res,
+      #                               function(x) length(x))>=Object@plot$aka3IndependentUnique$optimalNumber)]
       go_id_list <- res[which(lapply(res,
-                                     function(x) length(x))>=Object@plot$aka3IndependentUnique$optimalNumber)]
+                                     function(x) length(x))>=getOptimalNumber(res))]
+      go_id_list_new <- go_id_list
     }
-
-
+    
+    
     if (uniquePathways)
     {
       go_id_list_new <- go_id_list

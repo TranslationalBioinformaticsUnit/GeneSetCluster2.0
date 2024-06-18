@@ -1,4 +1,4 @@
-BreakUpCluster <- function(Object = Object, breakup.cluster = 6, sub.cluster=3, uniquePathways=F)
+BreakUpCluster_shiny <- function(Object = Object, breakup.cluster = 6, sub.cluster=3, uniquePathways=F)
 {
 
   message("[=========================================================]")

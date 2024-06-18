@@ -1,4 +1,4 @@
-ClusterGeneSets <- function(Object, clusters = 5, method = "kmeans", order = "group", molecular.signature = "All", user_function)
+ClusterGeneSets_shiny <- function(Object, clusters = 5, method = "kmeans", order = "group", molecular.signature = "All", user_function)
 {
   message("[=========================================================]")
   message("[<<<<            ClusterGeneSets START               >>>>>]")
@@ -419,6 +419,7 @@ ClusterGeneSets <- function(Object, clusters = 5, method = "kmeans", order = "gr
   Object@plot$aka2Unique = aka2Unique
   Object@plot$aka3 = aka3
   Object@plot$aka3Unique = aka3Unique
+
 
 
   message("-----------------------------------------------------------")
