@@ -6,7 +6,9 @@ This repository contains the code and data of the R-based tool GeneSetCluster2.0
 * [Examples](#examples)
 * [Quick start](#quick-start)
 * [Resources and Documentation](#resources-and-documentation)
-
+* [Conceptual general workflow](#Conceptual-general-workflow)
+* [Citation](#Citation)
+  
 ## Summary
 
 A new version 2.0, of [GeneSetCluster](https://github.com/TranslationalBioinformaticsUnit/GeneSetCluster) has been released. This R-based tool is designed for summarizing and integrating results from gene-set analyses (GSA). It is particularly useful when handling multiple GSAs derived from various data types or contrasting studies. The latest iteration of GeneSetCluster incorporates a multitude of innovative approaches to the analysis, such as a seriation-based approach, increased functional annotations, including descriptive and tissue enrichment, as well additional visualization techniques. A significant addition is the development of a user-friendly Shiny interface for GeneSetCluster 2.0. This interface is specifically tailored to assist clinicians and biologists with limited bioinformatics experience in their analyses. Moreover, we have meticulously implemented and documented the optimal interaction between the Shiny application and the R package. This enhancement is aimed at fostering efficient collaboration among multidisciplinary teams engaged in gene-set analysis.
@@ -71,5 +73,14 @@ GeneSetCluster::run_app()
 
 ![Schema of GeneSetCluster2.0](vignettes/img/Pipeline_new.png)
 
+
 ## Conceptual general workflow
 ![Conceptual workflow scheme](vignettes/img/General_workflow.png)
+
+## Citation
+
+Cite us if GeneSetCluster has been helpful.
+
+```
+Ortega-Legarreta, A., Maillo. A., et al. (2024). GeneSetCluster 2.0: a comprehensive toolset for summarizing and integrating gene-sets analysis. bioRxiv, 2024-12.
+```
