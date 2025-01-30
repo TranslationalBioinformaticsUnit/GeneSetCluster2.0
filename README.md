@@ -70,3 +70,6 @@ GeneSetCluster::run_app()
 * Schema of GeneSetCluster2.0:
 
 ![Schema of GeneSetCluster2.0](vignettes/img/Pipeline_new.png)
+
+## Conceptual general workflow
+![Conceptual workflow scheme](vignettes/img/General_workflow.png)
