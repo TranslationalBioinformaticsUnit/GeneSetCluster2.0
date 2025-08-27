@@ -80,7 +80,8 @@ GeneSetCluster::run_app()
 ## Citation
 
 Cite us if GeneSetCluster has been helpful.
+Scientific publication [available here](https://doi.org/10.1186/s12859-025-06249-3).
 
 ```
-Ortega-Legarreta, A., Maillo. A., et al. (2024). GeneSetCluster 2.0: a comprehensive toolset for summarizing and integrating gene-sets analysis. bioRxiv, 2024-12.
+Ortega-Legarreta, A., Maillo, A., Mouzo, D. et al. GeneSetCluster 2.0: a comprehensive toolset for summarizing and integrating gene-sets analysis. BMC Bioinformatics 26, 219 (2025)
 ```
